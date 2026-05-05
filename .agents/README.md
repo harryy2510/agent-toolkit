@@ -6,6 +6,9 @@ Commit these files:
 
 - `../AGENTS.md`
 - `agents.json`
+- `dotagent.lock.json` when DotAgent is installed for the repo
+- `dotagent/` role-profile and command references when DotAgent is installed for the repo
+- `skills/` when project or DotAgent skills are committed
 - `intel/`
 - root `../CLAUDE.md`
 - tool adapter folders such as `../.codex/`, `../.claude/`, `../.cursor/`, `../.gemini/`, `../.windsurf/`, `../.opencode/`, and similar generated integration output
@@ -19,6 +22,7 @@ Useful commands:
 
 ```bash
 agent-toolkit repo migrate
+agent-toolkit repo dotagent
 agent-toolkit repo check
 agent-toolkit repo sync --check
 agents status --path .

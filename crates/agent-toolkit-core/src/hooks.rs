@@ -149,7 +149,7 @@ fn agents_json() -> &'static str {
 }
 
 fn agents_readme() -> &'static str {
-    "# .agents\n\nProject-local source files for agent setup.\n\n- `agents.json`: cross-agent sync config\n- `intel/`: generated repo intelligence that may be committed in migrated repos. Agents should start at `intel/summary.md` before broad exploration.\n- `local.json`: machine-specific overrides, ignored by git\n"
+    "# .agents\n\nProject-local source files for agent setup.\n\n- `agents.json`: cross-agent sync config\n- `skills/`: committed project skills, including vendored DotAgent skills when `agent-toolkit repo dotagent` is used\n- `dotagent/`: vendored DotAgent role-profile and command references when DotAgent is installed for the repo\n- `dotagent.lock.json`: pinned DotAgent rules and skills snapshot when DotAgent is installed for the repo\n- `intel/`: generated repo intelligence that may be committed in migrated repos. Agents should start at `intel/summary.md` before broad exploration.\n- `local.json`: machine-specific overrides, ignored by git\n"
 }
 
 fn create_file_if_missing(

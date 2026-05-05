@@ -50,7 +50,17 @@ Agent Toolkit is a **fast open-source setup, repo intelligence, and enforcement 
 
 ## Quick Start
 
-Install or preview the global setup:
+For shared teams, make the repo carry the agent contract:
+
+```bash
+bunx @harryy/agent-toolkit repo migrate
+bunx @harryy/agent-toolkit repo dotagent
+agents sync --path .
+```
+
+`repo dotagent` pins the DotAgent rules into root `AGENTS.md`, vendors DotAgent skills into `.agents/skills/`, copies role-profile and command references under `.agents/dotagent/`, and writes `.agents/dotagent.lock.json`. Commit those repo files so new contributors get the same rules and skills from `git clone`, then run `agents sync --path .` to materialize local tool bridges.
+
+Install or preview the personal global setup when you want the same defaults outside an agentized repo:
 
 ```bash
 bunx @harryy/agent-toolkit setup --dry-run
@@ -60,7 +70,7 @@ bunx @harryy/agent-toolkit update
 
 End users need Bun only. Rust is not required for normal use because the published package ships prebuilt native binaries.
 
-`setup` installs the shared rules plugin, preserves existing user rules, and inserts managed Agent Toolkit blocks where supported. `update` pulls the latest DotAgent source and reapplies the packaged global rules without an extra prompt:
+`setup` installs the shared rules plugin, preserves existing user rules, and inserts managed Agent Toolkit blocks where supported. This is a personal convenience layer, not the team source of truth. `update` pulls the latest DotAgent source and reapplies the packaged global rules without an extra prompt:
 
 - Codex: `~/.codex/AGENTS.md`
 - Claude Code: `~/.claude/CLAUDE.md`
@@ -80,6 +90,7 @@ Repo setup:
 
 ```bash
 bunx @harryy/agent-toolkit repo migrate
+bunx @harryy/agent-toolkit repo dotagent
 bunx @harryy/agent-toolkit repo check
 ```
 
@@ -143,12 +154,12 @@ Each Gemini package contains `gemini-extension.json` plus a `GEMINI.md` context 
 
 ### Codex
 
-Codex reads repo instructions from `AGENTS.md`; global setup also installs managed shared rules into `~/.codex/AGENTS.md`.
+Codex reads repo instructions from `AGENTS.md`. For teams, prefer the repo-scoped DotAgent path so rules and skills are committed with the project. Global setup can still install managed shared rules into `~/.codex/AGENTS.md` for personal defaults.
 
 ```bash
-bunx @harryy/agent-toolkit setup --yes
-bunx @harryy/agent-toolkit update
 bunx @harryy/agent-toolkit repo migrate
+bunx @harryy/agent-toolkit repo dotagent
+bunx @harryy/agent-toolkit repo sync
 ```
 
 Codex plugin metadata lives beside each plugin:
@@ -421,7 +432,13 @@ agents sync --path .
 agents watch --path .
 ```
 
-Generated tool files stay local and are ignored by git.
+Team repos can also carry DotAgent as a pinned project dependency:
+
+```bash
+bunx @harryy/agent-toolkit repo dotagent
+```
+
+This commits the DotAgent instruction block in `AGENTS.md`, copies DotAgent skills into `.agents/skills/`, keeps role-profile and command references under `.agents/dotagent/`, and records the snapshot in `.agents/dotagent.lock.json`. Generated tool files stay local and are ignored by git unless the repo intentionally uses commit-generated sync output.
 
 For repos bootstrapped by Agent Toolkit, `scripts/agent-check` runs `agent-toolkit repo check`. Set `AGENT_TOOLKIT_SYNC_CHECK=1` when you also want hooks or CI to run `agents sync --path . --check`. Husky hooks call the same wrapper, so contributors do not need a global Agent Toolkit install.
 

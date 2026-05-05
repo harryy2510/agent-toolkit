@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use agent_toolkit_core::check::{check_repo, is_conventional_commit};
+use agent_toolkit_core::dotagent::install_repo_dotagent;
 use agent_toolkit_core::fleet::discover_git_repos;
 use agent_toolkit_core::global_setup::{
     apply_global_setup_plan, build_global_setup_plan, default_global_setup_options,
@@ -90,6 +91,42 @@ fn run() -> Result<(), String> {
                 }
                 Err("repo migrate finished with check failures".to_string())
             }
+        }
+        [scope, command, flags @ ..] if scope == "repo" && command == "dotagent" => {
+            let options = parse_repo_dotagent_args(flags)?;
+            let root = env::current_dir().map_err(|error| error.to_string())?;
+            let home = home_dir()?;
+            let explicit_dotagent_source = options.dotagent_source.is_some();
+            let dotagent_repo = options
+                .dotagent_source
+                .unwrap_or_else(|| home.join(".agent-toolkit/plugins/dotagent"));
+            if !dotagent_repo.join("plugins/dotagent/AGENTS.md").exists() {
+                if explicit_dotagent_source {
+                    return Err(format!(
+                        "DotAgent source was not found at {}",
+                        dotagent_repo.display()
+                    ));
+                }
+                ensure_dotagent_repo(&dotagent_repo)?;
+            }
+            let result =
+                install_repo_dotagent(&root, &dotagent_repo).map_err(|error| error.to_string())?;
+            for change in result.changes {
+                println!("{} {}", change.verb(), change.path);
+            }
+            if let Some(version) = result.version {
+                println!("installed DotAgent {version}");
+            } else {
+                println!("installed DotAgent");
+            }
+            println!("vendored {} skills", result.installed_skills.len());
+            for skipped in result.skipped_skills {
+                println!(
+                    "skipped {}: {} ({})",
+                    skipped.name, skipped.reason, skipped.path
+                );
+            }
+            Ok(())
         }
         [scope, command, flags @ ..] if scope == "repo" && command == "sync" => {
             let options = parse_sync_args(flags)?;
@@ -234,7 +271,7 @@ fn run() -> Result<(), String> {
 
 fn print_help() {
     println!(
-		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo migrate        Bootstrap, write repo intelligence, and check\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout"
+		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo migrate        Bootstrap, write repo intelligence, and check\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout"
 	);
 }
 
@@ -350,6 +387,30 @@ fn parse_setup_args(args: &[String]) -> Result<SetupCliOptions, String> {
 struct SyncCliOptions {
     check: bool,
     roots: Vec<PathBuf>,
+}
+
+#[derive(Debug, Default)]
+struct RepoDotAgentCliOptions {
+    dotagent_source: Option<PathBuf>,
+}
+
+fn parse_repo_dotagent_args(args: &[String]) -> Result<RepoDotAgentCliOptions, String> {
+    let mut options = RepoDotAgentCliOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--dotagent-source" => {
+                index += 1;
+                let Some(path) = args.get(index) else {
+                    return Err("--dotagent-source requires a path".to_string());
+                };
+                options.dotagent_source = Some(PathBuf::from(path));
+            }
+            flag => return Err(format!("unknown repo dotagent flag: {flag}")),
+        }
+        index += 1;
+    }
+    Ok(options)
 }
 
 fn parse_sync_args(args: &[String]) -> Result<SyncCliOptions, String> {
