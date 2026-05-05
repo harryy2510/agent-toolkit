@@ -58,7 +58,7 @@ bunx @harryy/agent-toolkit repo dotagent
 agents sync --path .
 ```
 
-`repo dotagent` pins the DotAgent rules into root `AGENTS.md`, vendors DotAgent skills into `.agents/skills/`, copies role-profile and command references under `.agents/dotagent/`, and writes `.agents/dotagent.lock.json`. Commit those repo files so new contributors get the same rules and skills from `git clone`, then run `agents sync --path .` to materialize local tool bridges.
+`repo dotagent` pins the DotAgent rules into root `AGENTS.md`, vendors DotAgent skills into `.agents/skills/`, copies role-profile and command references under `.agents/dotagent/`, and writes `.agents/dotagent.lock.json`. Commit those repo files so new contributors get the same rules and skills from `git clone`, then run `agents sync --path .` to materialize local tool bridges. Later runs use the lock's DotAgent version and git revision as the normal no-op gate; use `repo dotagent --force` only when you need to recopy the same snapshot.
 
 Install or preview the personal global setup when you want the same defaults outside an agentized repo:
 
@@ -438,7 +438,7 @@ Team repos can also carry DotAgent as a pinned project dependency:
 bunx @harryy/agent-toolkit repo dotagent
 ```
 
-This commits the DotAgent instruction block in `AGENTS.md`, copies DotAgent skills into `.agents/skills/`, keeps role-profile and command references under `.agents/dotagent/`, and records the snapshot in `.agents/dotagent.lock.json`. Generated tool files stay local and are ignored by git unless the repo intentionally uses commit-generated sync output.
+This commits the DotAgent instruction block in `AGENTS.md`, copies DotAgent skills into `.agents/skills/`, keeps role-profile and command references under `.agents/dotagent/`, and records the snapshot in `.agents/dotagent.lock.json`. Re-running the command is a no-op while the locked DotAgent version and revision match the source. Generated tool files stay local and are ignored by git unless the repo intentionally uses commit-generated sync output.
 
 For repos bootstrapped by Agent Toolkit, `scripts/agent-check` runs `agent-toolkit repo check`. Set `AGENT_TOOLKIT_SYNC_CHECK=1` when you also want hooks or CI to run `agents sync --path . --check`. Husky hooks call the same wrapper, so contributors do not need a global Agent Toolkit install.
 

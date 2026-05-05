@@ -26,9 +26,29 @@ pub struct RepoDotAgentResult {
     pub version: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RepoDotAgentOptions {
+    pub force: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExistingDotAgentLock {
+    revision: Option<String>,
+    skills: Vec<String>,
+    version: Option<String>,
+}
+
 pub fn install_repo_dotagent(
     root: &Path,
     dotagent_repo: &Path,
+) -> std::io::Result<RepoDotAgentResult> {
+    install_repo_dotagent_with_options(root, dotagent_repo, RepoDotAgentOptions::default())
+}
+
+pub fn install_repo_dotagent_with_options(
+    root: &Path,
+    dotagent_repo: &Path,
+    options: RepoDotAgentOptions,
 ) -> std::io::Result<RepoDotAgentResult> {
     let plugin_root = dotagent_repo.join(DOTAGENT_PLUGIN_PATH);
     let rules_path = plugin_root.join("AGENTS.md");
@@ -45,6 +65,24 @@ pub fn install_repo_dotagent(
             std::io::ErrorKind::NotFound,
             format!("{} was not found", skills_source.display()),
         ));
+    }
+
+    let version = read_dotagent_version(&plugin_root);
+    let revision = git_revision(dotagent_repo);
+    if !options.force {
+        if let Some(existing_lock) = existing_dotagent_lock(root) {
+            if dotagent_lock_matches(&existing_lock, version.as_deref(), revision.as_deref())
+                && dotagent_snapshot_exists(root, &plugin_root, &existing_lock)
+            {
+                return Ok(RepoDotAgentResult {
+                    changes: Vec::new(),
+                    installed_skills: existing_lock.skills,
+                    revision,
+                    skipped_skills: Vec::new(),
+                    version,
+                });
+            }
+        }
     }
 
     let mut changes = Vec::new();
@@ -102,8 +140,6 @@ pub fn install_repo_dotagent(
         installed_skills.push(skill_name);
     }
 
-    let version = read_dotagent_version(&plugin_root);
-    let revision = git_revision(dotagent_repo);
     write_lock_file(
         root,
         &installed_skills,
@@ -131,6 +167,35 @@ pub fn install_repo_dotagent(
         skipped_skills,
         version,
     })
+}
+
+fn dotagent_lock_matches(
+    lock: &ExistingDotAgentLock,
+    version: Option<&str>,
+    revision: Option<&str>,
+) -> bool {
+    lock.version.as_deref() == version && lock.revision.as_deref() == revision
+}
+
+fn dotagent_snapshot_exists(root: &Path, plugin_root: &Path, lock: &ExistingDotAgentLock) -> bool {
+    let Ok(agents) = fs::read_to_string(root.join("AGENTS.md")) else {
+        return false;
+    };
+    if !agents.contains(DOTAGENT_BLOCK_START) || !agents.contains(DOTAGENT_BLOCK_END) {
+        return false;
+    }
+    for skill in &lock.skills {
+        if !root.join(".agents/skills").join(skill).exists() {
+            return false;
+        }
+    }
+    if plugin_root.join("agents").exists() && !root.join(".agents/dotagent/agents").exists() {
+        return false;
+    }
+    if plugin_root.join("commands").exists() && !root.join(".agents/dotagent/commands").exists() {
+        return false;
+    }
+    true
 }
 
 fn managed_dotagent_block(rules: &str) -> String {
@@ -189,19 +254,42 @@ fn upsert_managed_block(
 }
 
 fn existing_managed_skills(root: &Path) -> BTreeSet<String> {
-    let Ok(contents) = fs::read_to_string(root.join(".agents/dotagent.lock.json")) else {
-        return BTreeSet::new();
-    };
-    let Ok(lock) = serde_json::from_str::<serde_json::Value>(&contents) else {
-        return BTreeSet::new();
-    };
-    lock.get("skills")
-        .and_then(|skills| skills.as_array())
-        .into_iter()
-        .flatten()
+    existing_dotagent_lock(root)
+        .map(|lock| lock.skills.into_iter().collect())
+        .unwrap_or_default()
+}
+
+fn existing_dotagent_lock(root: &Path) -> Option<ExistingDotAgentLock> {
+    let contents = fs::read_to_string(root.join(".agents/dotagent.lock.json")).ok()?;
+    let lock = serde_json::from_str::<serde_json::Value>(&contents).ok()?;
+    if lock
+        .get("schemaVersion")
+        .and_then(|version| version.as_u64())
+        != Some(1)
+    {
+        return None;
+    }
+    if lock.get("plugin").and_then(|plugin| plugin.as_str()) != Some("dotagent") {
+        return None;
+    }
+    let skills = lock
+        .get("skills")
+        .and_then(|skills| skills.as_array())?
+        .iter()
         .filter_map(|skill| skill.as_str())
         .map(str::to_string)
-        .collect()
+        .collect();
+    Some(ExistingDotAgentLock {
+        revision: lock
+            .get("revision")
+            .and_then(|revision| revision.as_str())
+            .map(str::to_string),
+        skills,
+        version: lock
+            .get("version")
+            .and_then(|version| version.as_str())
+            .map(str::to_string),
+    })
 }
 
 fn sorted_child_dirs(root: &Path) -> std::io::Result<Vec<PathBuf>> {
@@ -364,7 +452,7 @@ fn write_lock_file(
         "commandsPath": ".agents/dotagent/commands",
         "skills": installed_skills
     });
-    let mut contents = serde_json::to_string_pretty(&lock).map_err(json_to_io_error)?;
+    let mut contents = to_tab_indented_json(&lock)?;
     contents.push('\n');
     if fs::read_to_string(&path).ok().as_deref() == Some(contents.as_str()) {
         return Ok(());
@@ -383,6 +471,29 @@ fn write_lock_file(
 
 fn json_to_io_error(error: serde_json::Error) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidData, error)
+}
+
+fn to_tab_indented_json(value: &serde_json::Value) -> std::io::Result<String> {
+    let spaces = serde_json::to_string_pretty(value).map_err(json_to_io_error)?;
+    Ok(spaces
+        .lines()
+        .map(replace_json_indent_with_tabs)
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+fn replace_json_indent_with_tabs(line: &str) -> String {
+    let space_count = line
+        .chars()
+        .take_while(|character| *character == ' ')
+        .count();
+    let tab_count = space_count / 2;
+    let remaining_spaces = space_count % 2;
+    let mut updated = String::new();
+    updated.push_str(&"\t".repeat(tab_count));
+    updated.push_str(&" ".repeat(remaining_spaces));
+    updated.push_str(&line[space_count..]);
+    updated
 }
 
 #[cfg(test)]
@@ -445,6 +556,7 @@ mod tests {
         assert!(root.join(".agents/dotagent/agents/worker.md").exists());
         assert!(root.join(".agents/dotagent/commands/setup.md").exists());
         let lock = fs::read_to_string(root.join(".agents/dotagent.lock.json")).unwrap();
+        assert!(lock.contains("\n\t\""));
         assert!(lock.contains("\"version\": \"1.7.0\""));
         assert!(lock.contains("\"toolchain\""));
         assert!(lock.contains("\"roleProfilesPath\": \".agents/dotagent/agents\""));
@@ -454,6 +566,38 @@ mod tests {
             .iter()
             .any(|change| change.path == ".agents/skills/toolchain"));
         assert!(second_result.changes.is_empty());
+    }
+
+    #[test]
+    fn install_repo_dotagent_uses_lock_as_normal_noop_gate() {
+        let root = temp_dir("agent-toolkit-dotagent-lock-root");
+        let source = temp_dir("agent-toolkit-dotagent-lock-source");
+        fs::write(root.join("AGENTS.md"), "# Repo Rules\n").unwrap();
+        write_dotagent_source(&source);
+
+        install_repo_dotagent(&root, &source).unwrap();
+        fs::write(
+            root.join(".agents/skills/toolchain/SKILL.md"),
+            "---\nname: toolchain\n---\nUse Bun, formatted by the repo.\n",
+        )
+        .unwrap();
+
+        let second_result = install_repo_dotagent(&root, &source).unwrap();
+        let formatted_skill =
+            fs::read_to_string(root.join(".agents/skills/toolchain/SKILL.md")).unwrap();
+        assert!(second_result.changes.is_empty());
+        assert!(formatted_skill.contains("formatted by the repo"));
+
+        let forced_result =
+            install_repo_dotagent_with_options(&root, &source, RepoDotAgentOptions { force: true })
+                .unwrap();
+        let restored_skill =
+            fs::read_to_string(root.join(".agents/skills/toolchain/SKILL.md")).unwrap();
+        assert!(forced_result
+            .changes
+            .iter()
+            .any(|change| change.path == ".agents/skills/toolchain"));
+        assert_eq!(restored_skill, "---\nname: toolchain\n---\nUse Bun.\n");
     }
 
     #[test]

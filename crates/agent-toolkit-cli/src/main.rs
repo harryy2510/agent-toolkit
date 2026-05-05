@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use agent_toolkit_core::check::{check_repo, is_conventional_commit};
-use agent_toolkit_core::dotagent::install_repo_dotagent;
+use agent_toolkit_core::dotagent::{install_repo_dotagent_with_options, RepoDotAgentOptions};
 use agent_toolkit_core::fleet::discover_git_repos;
 use agent_toolkit_core::global_setup::{
     apply_global_setup_plan, build_global_setup_plan, default_global_setup_options,
@@ -109,8 +109,14 @@ fn run() -> Result<(), String> {
                 }
                 ensure_dotagent_repo(&dotagent_repo)?;
             }
-            let result =
-                install_repo_dotagent(&root, &dotagent_repo).map_err(|error| error.to_string())?;
+            let result = install_repo_dotagent_with_options(
+                &root,
+                &dotagent_repo,
+                RepoDotAgentOptions {
+                    force: options.force,
+                },
+            )
+            .map_err(|error| error.to_string())?;
             for change in result.changes {
                 println!("{} {}", change.verb(), change.path);
             }
@@ -271,7 +277,7 @@ fn run() -> Result<(), String> {
 
 fn print_help() {
     println!(
-		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo migrate        Bootstrap, write repo intelligence, and check\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout"
+		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo migrate        Bootstrap, write repo intelligence, and check\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
 	);
 }
 
@@ -392,6 +398,7 @@ struct SyncCliOptions {
 #[derive(Debug, Default)]
 struct RepoDotAgentCliOptions {
     dotagent_source: Option<PathBuf>,
+    force: bool,
 }
 
 fn parse_repo_dotagent_args(args: &[String]) -> Result<RepoDotAgentCliOptions, String> {
@@ -399,6 +406,9 @@ fn parse_repo_dotagent_args(args: &[String]) -> Result<RepoDotAgentCliOptions, S
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
+            "--force" => {
+                options.force = true;
+            }
             "--dotagent-source" => {
                 index += 1;
                 let Some(path) = args.get(index) else {
