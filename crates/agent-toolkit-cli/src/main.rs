@@ -1,6 +1,6 @@
 use std::env;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use agent_toolkit_core::check::{check_repo, is_conventional_commit};
 use agent_toolkit_core::dotagent::{install_repo_dotagent_with_options, RepoDotAgentOptions};
@@ -12,6 +12,7 @@ use agent_toolkit_core::global_setup::{
 use agent_toolkit_core::hooks::bootstrap_repo;
 use agent_toolkit_core::intel::write_repo_intel;
 use agent_toolkit_core::migrate::migrate_repo;
+use agent_toolkit_core::supabase::{db_lint_script, staged_db_lint_needed};
 
 fn main() {
     if let Err(error) = run() {
@@ -51,18 +52,23 @@ fn run() -> Result<(), String> {
             print!("{}", intel.summary_markdown);
             Ok(())
         }
-        [scope, command, ..] if scope == "repo" && command == "check" => {
+        [scope, command, flags @ ..] if scope == "repo" && command == "check" => {
             let root = env::current_dir().map_err(|error| error.to_string())?;
             let issues = check_repo(&root);
-            if issues.is_empty() {
-                println!("agent-toolkit repo check passed");
-                Ok(())
-            } else {
+            if !issues.is_empty() {
                 for issue in issues {
                     println!("{:?}: {}", issue.code, issue.message);
                 }
-                Err("repo check failed".to_string())
+                return Err("repo check failed".to_string());
             }
+
+            if flags.iter().any(|flag| flag.as_str() == "--staged") && staged_db_lint_needed(&root)
+            {
+                run_supabase_db_lint(&root)?;
+            }
+
+            println!("agent-toolkit repo check passed");
+            Ok(())
         }
         [scope, command] if scope == "repo" && command == "bootstrap" => {
             let root = env::current_dir().map_err(|error| error.to_string())?;
@@ -279,6 +285,71 @@ fn print_help() {
     println!(
 		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo migrate        Bootstrap, write repo intelligence, and check\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
 	);
+}
+
+fn run_supabase_db_lint(root: &Path) -> Result<(), String> {
+    if let Some(script) = db_lint_script(root) {
+        println!("running Supabase db lint via bun {script}");
+        return run_check_command(root, "bun", &["run", &script])
+            .map_err(CheckCommandError::into_message);
+    }
+
+    match run_check_command(root, "supabase", &["db", "lint", "--local", "--fail-on", "warning"])
+    {
+        Ok(()) => Ok(()),
+        Err(CheckCommandError::NotFound(_)) => {
+            run_check_command(
+                root,
+                "bunx",
+                &["supabase", "db", "lint", "--local", "--fail-on", "warning"],
+            )
+            .map_err(|error| match error {
+                CheckCommandError::NotFound(_) => {
+                    "Supabase project has staged database changes, but no db lint runner was found. Add a db:lint package script or install the Supabase CLI.".to_string()
+                }
+                error => error.into_message(),
+            })
+        }
+        Err(error) => Err(error.into_message()),
+    }
+}
+
+#[derive(Debug)]
+enum CheckCommandError {
+    NotFound(String),
+    Failed(String),
+}
+
+impl CheckCommandError {
+    fn into_message(self) -> String {
+        match self {
+            Self::NotFound(program) => format!("{program} not found"),
+            Self::Failed(message) => message,
+        }
+    }
+}
+
+fn run_check_command(root: &Path, program: &str, args: &[&str]) -> Result<(), CheckCommandError> {
+    let status = std::process::Command::new(program)
+        .args(args)
+        .current_dir(root)
+        .status()
+        .map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                CheckCommandError::NotFound(program.to_string())
+            } else {
+                CheckCommandError::Failed(format!("failed to run {program}: {error}"))
+            }
+        })?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(CheckCommandError::Failed(format!(
+            "{program} {} failed",
+            args.join(" ")
+        )))
+    }
 }
 
 fn run_setup(args: &[String]) -> Result<(), String> {

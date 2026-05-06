@@ -5,3 +5,4 @@ pub mod global_setup;
 pub mod hooks;
 pub mod intel;
 pub mod migrate;
+pub mod supabase;

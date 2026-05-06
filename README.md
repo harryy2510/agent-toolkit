@@ -239,6 +239,7 @@ The check command enforces:
 - Deslop-style checks catch debug statements, placeholders, empty catches, and likely hardcoded secrets.
 - Local/private agent state such as `.agents/local.json` and `.agents/generated/` is blocked when tracked by git; migrated repo intel and tool adapters such as `.agents/intel/`, `CLAUDE.md`, `.codex/`, `.gemini/`, and `.cursor/` are allowed to be committed.
 - Bootstrapped Husky hooks enforce Conventional Commit messages.
+- In Supabase projects, `repo check --staged` runs database lint for staged Supabase SQL/config changes, preferring a project script such as `db:lint` or `lint:db` before falling back to `supabase db lint --local --fail-on warning`.
 
 Use the migration commands to make this standard repeatable:
 
