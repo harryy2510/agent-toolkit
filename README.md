@@ -75,6 +75,7 @@ End users need Bun only. Rust is not required for normal use because the publish
 - Codex: `~/.codex/AGENTS.md`
 - Claude Code: `~/.claude/CLAUDE.md`
 - Gemini CLI: links the Gemini extension when `gemini` is installed
+- DotAgent source cache: `~/.agent-toolkit/plugins/dotagent`
 
 Useful setup flags:
 
@@ -87,6 +88,7 @@ bunx @harryy/agent-toolkit teardown --yes
 bunx @harryy/agent-toolkit setup --all --yes
 bunx @harryy/agent-toolkit setup --skip-gemini --yes
 bunx @harryy/agent-toolkit teardown --skip-gemini --yes
+bunx @harryy/agent-toolkit teardown --keep-source --yes
 ```
 
 Repo setup:
@@ -157,7 +159,7 @@ Each Gemini package contains `gemini-extension.json` plus a `GEMINI.md` context 
 
 ### Codex
 
-Codex reads repo instructions from `AGENTS.md`. For teams, prefer the repo-scoped DotAgent path so rules and skills are committed with the project. Global setup can still install managed shared rules into `~/.codex/AGENTS.md` for personal defaults.
+Codex reads repo instructions from `AGENTS.md`. For teams, prefer the repo-scoped DotAgent path so rules and skills are committed with the project. Top-level `setup` can still install managed shared rules into `~/.codex/AGENTS.md` for personal defaults.
 
 ```bash
 bunx @harryy/agent-toolkit repo setup

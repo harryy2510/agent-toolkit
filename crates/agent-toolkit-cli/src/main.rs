@@ -281,7 +281,7 @@ fn run() -> Result<(), String> {
 
 fn print_help() {
     println!(
-		"agent-toolkit\n\nCommands:\n  setup [flags]       Install personal managed agent rules\n  update [flags]      Update DotAgent source and reapply personal managed rules\n  teardown [flags]    Remove personal managed agent rules\n  repo setup [flags]  Bootstrap, write repo intelligence, install DotAgent, sync, and check\n  repo migrate [flags] Alias for repo setup\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nTeardown flags:\n  --dry-run                  Print the teardown plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --skip-gemini             Do not remove the Gemini extension link\n\nRepo setup flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches\n  --skip-sync               Do not run agents sync after writing repo files\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
+		"agent-toolkit\n\nCommands:\n  setup [flags]       Install personal managed agent rules\n  update [flags]      Update DotAgent source and reapply personal managed rules\n  teardown [flags]    Remove personal managed agent rules and DotAgent source cache\n  repo setup [flags]  Bootstrap, write repo intelligence, install DotAgent, sync, and check\n  repo migrate [flags] Alias for repo setup\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nTeardown flags:\n  --dry-run                  Print the teardown plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --skip-gemini             Do not remove the Gemini extension link\n  --keep-source             Keep ~/.agent-toolkit/plugins/dotagent\n\nRepo setup flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches\n  --skip-sync               Do not run agents sync after writing repo files\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
 	);
 }
 
@@ -425,7 +425,7 @@ fn run_update(args: &[String]) -> Result<(), String> {
 fn run_teardown(args: &[String]) -> Result<(), String> {
     let options = parse_teardown_args(args)?;
     let home = home_dir()?;
-    print_teardown_plan(&home, !options.skip_gemini);
+    print_teardown_plan(&home, !options.skip_gemini, !options.keep_source);
 
     if options.dry_run {
         return Ok(());
@@ -440,6 +440,7 @@ fn run_teardown(args: &[String]) -> Result<(), String> {
         &home,
         GlobalTeardownOptions {
             include_gemini: !options.skip_gemini,
+            remove_dotagent_source: !options.keep_source,
         },
     )
     .map_err(|error| error.to_string())?;
@@ -451,6 +452,9 @@ fn run_teardown(args: &[String]) -> Result<(), String> {
     }
     for path in result.removed_extensions {
         println!("removed Gemini extension {}", path.display());
+    }
+    for path in result.removed_sources {
+        println!("removed DotAgent source cache {}", path.display());
     }
     for skipped in result.skipped_extensions {
         println!(
@@ -536,6 +540,7 @@ struct TeardownCliOptions {
     yes: bool,
     dry_run: bool,
     skip_gemini: bool,
+    keep_source: bool,
 }
 
 fn parse_setup_args(args: &[String]) -> Result<SetupCliOptions, String> {
@@ -568,6 +573,7 @@ fn parse_teardown_args(args: &[String]) -> Result<TeardownCliOptions, String> {
             "--yes" | "-y" => options.yes = true,
             "--dry-run" => options.dry_run = true,
             "--skip-gemini" => options.skip_gemini = true,
+            "--keep-source" => options.keep_source = true,
             flag => return Err(format!("unknown teardown flag: {flag}")),
         }
     }
@@ -733,7 +739,7 @@ fn print_setup_plan(plan: &agent_toolkit_core::global_setup::GlobalSetupPlan) {
     }
 }
 
-fn print_teardown_plan(home: &Path, include_gemini: bool) {
+fn print_teardown_plan(home: &Path, include_gemini: bool, remove_source: bool) {
     println!("Teardown plan");
     println!(
         "action Claude: Remove managed rules block -> {}",
@@ -754,6 +760,14 @@ fn print_teardown_plan(home: &Path, include_gemini: bool) {
         );
     } else {
         println!("skip Gemini: disabled by --skip-gemini");
+    }
+    if remove_source {
+        println!(
+            "action DotAgent: Remove source cache -> {}",
+            home.join(".agent-toolkit/plugins/dotagent").display()
+        );
+    } else {
+        println!("skip DotAgent source cache: disabled by --keep-source");
     }
 }
 
@@ -845,11 +859,13 @@ mod tests {
             "--yes".to_string(),
             "--dry-run".to_string(),
             "--skip-gemini".to_string(),
+            "--keep-source".to_string(),
         ])
         .unwrap();
 
         assert!(options.yes);
         assert!(options.dry_run);
         assert!(options.skip_gemini);
+        assert!(options.keep_source);
     }
 }

@@ -16,6 +16,7 @@ pub struct GlobalTeardownResult {
     pub updated_files: Vec<PathBuf>,
     pub updated_codex_marketplaces: Vec<PathBuf>,
     pub removed_extensions: Vec<PathBuf>,
+    pub removed_sources: Vec<PathBuf>,
     pub skipped_extensions: Vec<GlobalSetupExtensionSkip>,
 }
 
@@ -41,6 +42,7 @@ pub struct GlobalSetupOptions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GlobalTeardownOptions {
     pub include_gemini: bool,
+    pub remove_dotagent_source: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -223,6 +225,7 @@ pub fn teardown_global_rules(
     let mut updated_files = Vec::new();
     let mut updated_codex_marketplaces = Vec::new();
     let mut removed_extensions = Vec::new();
+    let mut removed_sources = Vec::new();
     let mut skipped_extensions = Vec::new();
 
     for path in [
@@ -254,10 +257,20 @@ pub fn teardown_global_rules(
         }
     }
 
+    if options.remove_dotagent_source {
+        let source = home.join(".agent-toolkit/plugins/dotagent");
+        if remove_path_if_exists(&source)? {
+            removed_sources.push(source);
+            remove_dir_if_empty(&home.join(".agent-toolkit/plugins"))?;
+            remove_dir_if_empty(&home.join(".agent-toolkit"))?;
+        }
+    }
+
     Ok(GlobalTeardownResult {
         updated_files,
         updated_codex_marketplaces,
         removed_extensions,
+        removed_sources,
         skipped_extensions,
     })
 }
@@ -458,6 +471,35 @@ fn remove_broken_symlink(path: &Path) -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+fn remove_path_if_exists(path: &Path) -> std::io::Result<bool> {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return Ok(false);
+    };
+
+    if metadata.is_dir() && !metadata.file_type().is_symlink() {
+        fs::remove_dir_all(path)?;
+    } else {
+        fs::remove_file(path)?;
+    }
+
+    Ok(true)
+}
+
+fn remove_dir_if_empty(path: &Path) -> std::io::Result<()> {
+    match fs::remove_dir(path) {
+        Ok(()) => Ok(()),
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::DirectoryNotEmpty
+            ) =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn upsert_codex_marketplace_config(path: &Path, source: &Path) -> std::io::Result<()> {
@@ -716,9 +758,12 @@ source = "/other"
     fn teardown_global_rules_removes_only_managed_global_artifacts() {
         let root = temp_dir("agent-toolkit-global-teardown");
         let home = root.join("home");
+        let dotagent_source = home.join(".agent-toolkit/plugins/dotagent");
         fs::create_dir_all(home.join(".claude")).unwrap();
         fs::create_dir_all(home.join(".codex")).unwrap();
         fs::create_dir_all(home.join(".gemini/extensions/dotagent")).unwrap();
+        fs::create_dir_all(&dotagent_source).unwrap();
+        fs::write(dotagent_source.join("README.md"), "# DotAgent\n").unwrap();
         fs::write(
             home.join(".claude/CLAUDE.md"),
             upsert_managed_block("# My Claude Rules\n", "DOTAGENT", "# Shared\n"),
@@ -750,6 +795,7 @@ source = "/other"
             &home,
             GlobalTeardownOptions {
                 include_gemini: true,
+                remove_dotagent_source: true,
             },
         )
         .unwrap();
@@ -772,6 +818,7 @@ source = "/other"
             result.removed_extensions,
             vec![home.join(".gemini/extensions/dotagent")]
         );
+        assert_eq!(result.removed_sources, vec![dotagent_source]);
         assert!(claude.contains("# My Claude Rules"));
         assert!(!claude.contains("AGENT-TOOLKIT:DOTAGENT"));
         assert!(codex.contains("# My Codex Rules"));
@@ -779,6 +826,7 @@ source = "/other"
         assert!(config.contains("approval_policy = \"on-request\""));
         assert!(!config.contains("[marketplaces.dotagent]"));
         assert!(!home.join(".gemini/extensions/dotagent").exists());
+        assert!(!home.join(".agent-toolkit/plugins/dotagent").exists());
     }
 
     #[test]
