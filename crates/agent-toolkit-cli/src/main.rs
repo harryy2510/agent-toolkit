@@ -11,7 +11,7 @@ use agent_toolkit_core::global_setup::{
 };
 use agent_toolkit_core::hooks::bootstrap_repo;
 use agent_toolkit_core::intel::write_repo_intel;
-use agent_toolkit_core::migrate::migrate_repo;
+use agent_toolkit_core::migrate::{migrate_repo, setup_repo, RepoSetupOptions};
 use agent_toolkit_core::supabase::{db_lint_script, staged_db_lint_needed};
 
 const DEFAULT_SUPABASE_DB_LINT_ARGS: [&str; 9] = [
@@ -90,25 +90,10 @@ fn run() -> Result<(), String> {
             }
             Ok(())
         }
-        [scope, command] if scope == "repo" && command == "migrate" => {
-            let root = env::current_dir().map_err(|error| error.to_string())?;
-            let result = migrate_repo(&root).map_err(|error| error.to_string())?;
-            for change in result.changes {
-                println!("{} {}", change.verb(), change.path);
-            }
-            println!(
-                "wrote repo intelligence for {} source files",
-                result.intel.file_count
-            );
-            if result.issues.is_empty() {
-                println!("agent-toolkit repo migrate passed");
-                Ok(())
-            } else {
-                for issue in result.issues {
-                    println!("{:?}: {}", issue.code, issue.message);
-                }
-                Err("repo migrate finished with check failures".to_string())
-            }
+        [scope, command, flags @ ..]
+            if scope == "repo" && (command == "setup" || command == "migrate") =>
+        {
+            run_repo_setup(command, flags)
         }
         [scope, command, flags @ ..] if scope == "repo" && command == "dotagent" => {
             let options = parse_repo_dotagent_args(flags)?;
@@ -295,7 +280,7 @@ fn run() -> Result<(), String> {
 
 fn print_help() {
     println!(
-		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo migrate        Bootstrap, write repo intelligence, and check\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
+		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo setup [flags]  Bootstrap, write repo intelligence, install DotAgent, sync, and check\n  repo migrate [flags] Alias for repo setup\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nRepo setup flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches\n  --skip-sync               Do not run agents sync after writing repo files\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
 	);
 }
 
@@ -436,6 +421,65 @@ fn run_update(args: &[String]) -> Result<(), String> {
     run_setup(&setup_args)
 }
 
+fn run_repo_setup(command: &str, args: &[String]) -> Result<(), String> {
+    let options = parse_repo_setup_args(args)?;
+    let root = env::current_dir().map_err(|error| error.to_string())?;
+    let home = home_dir()?;
+    let explicit_dotagent_source = options.dotagent_source.is_some();
+    let dotagent_repo = options
+        .dotagent_source
+        .unwrap_or_else(|| home.join(".agent-toolkit/plugins/dotagent"));
+    if !dotagent_repo.join("plugins/dotagent/AGENTS.md").exists() {
+        if explicit_dotagent_source {
+            return Err(format!(
+                "DotAgent source was not found at {}",
+                dotagent_repo.display()
+            ));
+        }
+        ensure_dotagent_repo(&dotagent_repo)?;
+    }
+
+    let result = setup_repo(
+        &root,
+        &dotagent_repo,
+        RepoSetupOptions {
+            force_dotagent: options.force_dotagent,
+        },
+    )
+    .map_err(|error| error.to_string())?;
+    for change in result.changes {
+        println!("{} {}", change.verb(), change.path);
+    }
+    println!(
+        "wrote repo intelligence for {} source files",
+        result.intel.file_count
+    );
+    if let Some(version) = result.dotagent.version {
+        println!("installed DotAgent {version}");
+    } else {
+        println!("installed DotAgent");
+    }
+    println!("vendored {} skills", result.dotagent.installed_skills.len());
+    for skipped in result.dotagent.skipped_skills {
+        println!(
+            "skipped {}: {} ({})",
+            skipped.name, skipped.reason, skipped.path
+        );
+    }
+    if !options.skip_sync {
+        run_agents_sync(&root, false)?;
+    }
+    if result.issues.is_empty() {
+        println!("agent-toolkit repo {command} passed");
+        Ok(())
+    } else {
+        for issue in result.issues {
+            println!("{:?}: {}", issue.code, issue.message);
+        }
+        Err(format!("repo {command} finished with check failures"))
+    }
+}
+
 #[derive(Debug, Default)]
 struct SetupCliOptions {
     yes: bool,
@@ -478,6 +522,38 @@ struct SyncCliOptions {
 struct RepoDotAgentCliOptions {
     dotagent_source: Option<PathBuf>,
     force: bool,
+}
+
+#[derive(Debug, Default)]
+struct RepoSetupCliOptions {
+    dotagent_source: Option<PathBuf>,
+    force_dotagent: bool,
+    skip_sync: bool,
+}
+
+fn parse_repo_setup_args(args: &[String]) -> Result<RepoSetupCliOptions, String> {
+    let mut options = RepoSetupCliOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--force" => {
+                options.force_dotagent = true;
+            }
+            "--skip-sync" => {
+                options.skip_sync = true;
+            }
+            "--dotagent-source" => {
+                index += 1;
+                let Some(path) = args.get(index) else {
+                    return Err("--dotagent-source requires a path".to_string());
+                };
+                options.dotagent_source = Some(PathBuf::from(path));
+            }
+            flag => return Err(format!("unknown repo setup flag: {flag}")),
+        }
+        index += 1;
+    }
+    Ok(options)
 }
 
 fn parse_repo_dotagent_args(args: &[String]) -> Result<RepoDotAgentCliOptions, String> {
@@ -640,5 +716,28 @@ fn ensure_dotagent_repo(path: &std::path::Path) -> Result<(), String> {
         Ok(())
     } else {
         Err("failed to clone dotagent source repo".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_repo_setup_args_supports_dotagent_source_force_and_skip_sync() {
+        let options = parse_repo_setup_args(&[
+            "--dotagent-source".to_string(),
+            "/tmp/dotagent".to_string(),
+            "--force".to_string(),
+            "--skip-sync".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            options.dotagent_source,
+            Some(PathBuf::from("/tmp/dotagent"))
+        );
+        assert!(options.force_dotagent);
+        assert!(options.skip_sync);
     }
 }
