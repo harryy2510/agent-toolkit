@@ -174,15 +174,15 @@ Each plugin repo also includes `.agents/plugins/marketplace.json` for Codex-comp
 
 ### Other Agents
 
-| Agent/tool | Support path |
-|---|---|
-| AGENTS.md-aware agents | Read committed `AGENTS.md` directly. |
-| Cursor | Run `agents sync --path .` to generate local Cursor config. |
-| VS Code Copilot | Run `agents sync --path .` to generate local VS Code MCP config. |
-| Windsurf | Run `agents sync --path .`; user-level MCP sync stays local. |
-| Antigravity | Run `agents sync --path .`; global sync is disabled by default. |
-| OpenCode | Run `agents sync --path .` to generate local `opencode` config. |
-| Junie | Run `agents sync --path .` to generate local Junie MCP config. |
+| Agent/tool             | Support path                                                     |
+| ---------------------- | ---------------------------------------------------------------- |
+| AGENTS.md-aware agents | Read committed `AGENTS.md` directly.                             |
+| Cursor                 | Run `agents sync --path .` to generate local Cursor config.      |
+| VS Code Copilot        | Run `agents sync --path .` to generate local VS Code MCP config. |
+| Windsurf               | Run `agents sync --path .`; user-level MCP sync stays local.     |
+| Antigravity            | Run `agents sync --path .`; global sync is disabled by default.  |
+| OpenCode               | Run `agents sync --path .` to generate local `opencode` config.  |
+| Junie                  | Run `agents sync --path .` to generate local Junie MCP config.   |
 
 ---
 
@@ -239,7 +239,7 @@ The check command enforces:
 - Deslop-style checks catch debug statements, placeholders, empty catches, and likely hardcoded secrets.
 - Local/private agent state such as `.agents/local.json` and `.agents/generated/` is blocked when tracked by git; migrated repo intel and tool adapters such as `.agents/intel/`, `CLAUDE.md`, `.codex/`, `.gemini/`, and `.cursor/` are allowed to be committed.
 - Bootstrapped Husky hooks enforce Conventional Commit messages.
-- In Supabase projects, `repo check --staged` runs database lint for staged Supabase SQL/config changes, preferring a project script such as `db:lint` or `lint:db` before falling back to `supabase db lint --local --fail-on warning`.
+- In Supabase projects, `repo check --staged` runs database lint for staged Supabase SQL/config changes, preferring a project script such as `db:lint` or `lint:db` before falling back to `supabase db lint --local --schema public --level warning --fail-on warning`. Add a project script when a repo needs to lint extra app schemas.
 
 Use the migration commands to make this standard repeatable:
 
@@ -299,11 +299,11 @@ Do not use JavaScript source files, `tsc`, ESLint, or Prettier in this repo. Use
 
 ## Plugin Catalog
 
-| Plugin | Description | What You Get | Plugin ID |
-|--------|-------------|--------------|---------|
-| **dotagent** | Code conventions, agents, and tooling for all projects | 21 skills, 20 agents, 6 commands | `dotagent@agent-toolkit` |
-| **vibe-pilot** | AI kanban autopilot for classify, triage, and status reports | 4 skills, 3 commands | `vibe-pilot@agent-toolkit` |
-| **web-smith** | Website cloning and static site optimization | 2 skills, headless audit workflow | `web-smith@agent-toolkit` |
+| Plugin         | Description                                                  | What You Get                      | Plugin ID                  |
+| -------------- | ------------------------------------------------------------ | --------------------------------- | -------------------------- |
+| **dotagent**   | Code conventions, agents, and tooling for all projects       | 21 skills, 20 agents, 6 commands  | `dotagent@agent-toolkit`   |
+| **vibe-pilot** | AI kanban autopilot for classify, triage, and status reports | 4 skills, 3 commands              | `vibe-pilot@agent-toolkit` |
+| **web-smith**  | Website cloning and static site optimization                 | 2 skills, headless audit workflow | `web-smith@agent-toolkit`  |
 
 ---
 
@@ -346,14 +346,14 @@ Do not use JavaScript source files, `tsc`, ESLint, or Prettier in this repo. Use
 
 ### Skills at a Glance
 
-| Category | Skills | What They Cover |
-|----------|--------|-----------------|
-| **UI & Components** | `ui`, `shadcn`, `forms-rhf-zod` | Tailwind v4, shadcn/base-ui, CVA, dark mode, react-hook-form + zod |
-| **State & Data** | `zustand-x-ui-state`, `react-query-mutative` | zustand-x v6, React Query, optimistic updates, key factories |
-| **Frameworks** | `tanstack-start-cloudflare`, `vite`, `cloudflare` | Routing, server functions, SSR, Workers, Wrangler config |
-| **Backend** | `supabase-auth-data`, `supabase-postgres-best-practices` | 3 Supabase clients, auth flow, RLS, migrations, query optimization |
-| **Quality** | `react-best-practices`, `conventions`, `deslop`, `testing`, `debugging` | 57 perf rules, oxlint/oxfmt enforcement, AI slop detection, Vitest + Playwright, root-cause workflows |
-| **Tooling** | `project-setup`, `scaffold`, `toolchain`, `repo-intelligence`, `agent-routing`, `repo-map` | DX tooling, fullstack scaffolding, codebase symbol indexing, agent routing |
+| Category            | Skills                                                                                     | What They Cover                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **UI & Components** | `ui`, `shadcn`, `forms-rhf-zod`                                                            | Tailwind v4, shadcn/base-ui, CVA, dark mode, react-hook-form + zod                                    |
+| **State & Data**    | `zustand-x-ui-state`, `react-query-mutative`                                               | zustand-x v6, React Query, optimistic updates, key factories                                          |
+| **Frameworks**      | `tanstack-start-cloudflare`, `vite`, `cloudflare`                                          | Routing, server functions, SSR, Workers, Wrangler config                                              |
+| **Backend**         | `supabase-auth-data`, `supabase-postgres-best-practices`                                   | 3 Supabase clients, auth flow, RLS, migrations, query optimization                                    |
+| **Quality**         | `react-best-practices`, `conventions`, `deslop`, `testing`, `debugging`                    | 57 perf rules, oxlint/oxfmt enforcement, AI slop detection, Vitest + Playwright, root-cause workflows |
+| **Tooling**         | `project-setup`, `scaffold`, `toolchain`, `repo-intelligence`, `agent-routing`, `repo-map` | DX tooling, fullstack scaffolding, codebase symbol indexing, agent routing                            |
 
 ### Agents at a Glance
 
@@ -398,12 +398,12 @@ Full documentation: [github.com/harryy2510/dotagent](https://github.com/harryy25
 
 ### Skills
 
-| Skill | What It Does |
-|-------|--------------|
-| **classify** | Scans repos and classifies kanban tasks by complexity, domain, and priority |
-| **triage** | Breaks complex tasks into actionable subtasks with dependencies |
-| **implement** | Picks the next task, launches an AI workspace, and builds it |
-| **status-report** | Generates progress reports across all tracked projects |
+| Skill             | What It Does                                                                |
+| ----------------- | --------------------------------------------------------------------------- |
+| **classify**      | Scans repos and classifies kanban tasks by complexity, domain, and priority |
+| **triage**        | Breaks complex tasks into actionable subtasks with dependencies             |
+| **implement**     | Picks the next task, launches an AI workspace, and builds it                |
+| **status-report** | Generates progress reports across all tracked projects                      |
 
 Full documentation: [github.com/harryy2510/vibe-pilot](https://github.com/harryy2510/vibe-pilot)
 
@@ -415,10 +415,10 @@ Full documentation: [github.com/harryy2510/vibe-pilot](https://github.com/harryy
 
 ### Skills
 
-| Skill | What It Does |
-|-------|--------------|
+| Skill              | What It Does                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
 | **website-cloner** | Scrapes a source site, extracts design tokens, scaffolds Astro, rebuilds pages, and hands off to optimization |
-| **site-optimizer** | Audits and fixes performance, accessibility, SEO, images, fonts, and static-site delivery |
+| **site-optimizer** | Audits and fixes performance, accessibility, SEO, images, fonts, and static-site delivery                     |
 
 Full documentation: [github.com/harryy2510/web-smith](https://github.com/harryy2510/web-smith)
 

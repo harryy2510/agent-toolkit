@@ -14,6 +14,18 @@ use agent_toolkit_core::intel::write_repo_intel;
 use agent_toolkit_core::migrate::migrate_repo;
 use agent_toolkit_core::supabase::{db_lint_script, staged_db_lint_needed};
 
+const DEFAULT_SUPABASE_DB_LINT_ARGS: [&str; 9] = [
+    "db",
+    "lint",
+    "--local",
+    "--schema",
+    "public",
+    "--level",
+    "warning",
+    "--fail-on",
+    "warning",
+];
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("agent-toolkit: {error}");
@@ -294,16 +306,12 @@ fn run_supabase_db_lint(root: &Path) -> Result<(), String> {
             .map_err(CheckCommandError::into_message);
     }
 
-    match run_check_command(root, "supabase", &["db", "lint", "--local", "--fail-on", "warning"])
-    {
+    match run_check_command(root, "supabase", &DEFAULT_SUPABASE_DB_LINT_ARGS) {
         Ok(()) => Ok(()),
         Err(CheckCommandError::NotFound(_)) => {
-            run_check_command(
-                root,
-                "bunx",
-                &["supabase", "db", "lint", "--local", "--fail-on", "warning"],
-            )
-            .map_err(|error| match error {
+            let mut args = vec!["supabase"];
+            args.extend(DEFAULT_SUPABASE_DB_LINT_ARGS);
+            run_check_command(root, "bunx", &args).map_err(|error| match error {
                 CheckCommandError::NotFound(_) => {
                     "Supabase project has staged database changes, but no db lint runner was found. Add a db:lint package script or install the Supabase CLI.".to_string()
                 }
