@@ -18,7 +18,8 @@ const REPO_INTEL_AGENTS_BLOCK: &str = concat!(
     "<!-- AGENT-TOOLKIT:REPO-INTEL:START -->\n",
     "## Agent Toolkit Repo Intelligence\n\n",
     "- Before broad exploration, read `.agents/intel/summary.md` if it exists.\n",
-    "- Use the task-specific intel files it links to (`overview.md`, `tasks.md`, `graph.md`, `database.md`, and similar) to find the relevant source files before editing.\n",
+    "- Treat `summary.md`, `overview.md`, and `tasks.md` as the startup index; open task-specific files only after that index points to them.\n",
+    "- Treat `.agents/intel/repo.json`, `database.md`, `imports.md`, and `calls.md` as deep-read only. Do not bulk-read them during normal startup.\n",
     "- `.agents/intel/` is generated repo intelligence and may be committed in migrated repos.\n",
     "<!-- AGENT-TOOLKIT:REPO-INTEL:END -->\n",
 );
@@ -114,7 +115,8 @@ fn agents_md() -> &'static str {
         "<!-- AGENT-TOOLKIT:REPO-INTEL:START -->\n",
         "## Agent Toolkit Repo Intelligence\n\n",
         "- Before broad exploration, read `.agents/intel/summary.md` if it exists.\n",
-        "- Use the task-specific intel files it links to (`overview.md`, `tasks.md`, `graph.md`, `database.md`, and similar) to find the relevant source files before editing.\n",
+        "- Treat `summary.md`, `overview.md`, and `tasks.md` as the startup index; open task-specific files only after that index points to them.\n",
+        "- Treat `.agents/intel/repo.json`, `database.md`, `imports.md`, and `calls.md` as deep-read only. Do not bulk-read them during normal startup.\n",
         "- `.agents/intel/` is generated repo intelligence and may be committed in migrated repos.\n",
         "<!-- AGENT-TOOLKIT:REPO-INTEL:END -->\n",
     )
@@ -149,7 +151,7 @@ fn agents_json() -> &'static str {
 }
 
 fn agents_readme() -> &'static str {
-    "# .agents\n\nProject-local source files for agent setup.\n\n- `agents.json`: cross-agent sync config\n- `skills/`: committed project skills, including vendored DotAgent skills when `agent-toolkit repo dotagent` is used\n- `dotagent/`: vendored DotAgent role-profile and command references when DotAgent is installed for the repo\n- `dotagent.lock.json`: pinned DotAgent rules and skills snapshot when DotAgent is installed for the repo\n- `intel/`: generated repo intelligence that may be committed in migrated repos. Agents should start at `intel/summary.md` before broad exploration.\n- `local.json`: machine-specific overrides, ignored by git\n"
+    "# .agents\n\nProject-local source files for agent setup.\n\n- `agents.json`: cross-agent sync config\n- `skills/`: committed project skills, including vendored DotAgent skills when `agent-toolkit repo dotagent` is used\n- `dotagent/`: vendored DotAgent role-profile and command references when DotAgent is installed for the repo\n- `dotagent.lock.json`: pinned DotAgent rules and skills snapshot when DotAgent is installed for the repo\n- `intel/`: generated repo intelligence that may be committed in migrated repos. Agents should start at `intel/summary.md`, use `intel/manifest.json` for read-policy tiers, and treat `repo.json`, `database.md`, `imports.md`, and `calls.md` as deep-read only.\n- `local.json`: machine-specific overrides, ignored by git\n"
 }
 
 fn create_file_if_missing(
@@ -470,6 +472,7 @@ mod tests {
         assert!(root.join(".husky/commit-msg").exists());
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("Before broad exploration, read `.agents/intel/summary.md`"));
+        assert!(agents.contains("repo.json`, `database.md`, `imports.md`, and `calls.md`"));
         assert_eq!(
             agents
                 .matches("<!-- AGENT-TOOLKIT:REPO-INTEL:START -->")
@@ -483,6 +486,7 @@ mod tests {
         ));
         let agents_readme = fs::read_to_string(root.join(".agents/README.md")).unwrap();
         assert!(agents_readme.contains("Agents should start at `intel/summary.md`"));
+        assert!(agents_readme.contains("deep-read only"));
         let agents_json = fs::read_to_string(root.join(".agents/agents.json")).unwrap();
         assert!(agents_json.contains("\"claude\""));
         assert!(agents_json.contains("\"gemini\""));
@@ -570,6 +574,7 @@ mod tests {
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("Keep this repo-specific guidance."));
         assert!(agents.contains("Before broad exploration, read `.agents/intel/summary.md`"));
+        assert!(agents.contains("Do not bulk-read them during normal startup."));
         assert_eq!(
             agents
                 .matches("<!-- AGENT-TOOLKIT:REPO-INTEL:START -->")

@@ -1,5 +1,10 @@
 # Call Sites
 
+## Read Policy
+
+- Tier: `deep-context`
+- Deep-read only. Open for exact API/call-site tracing after a focused target is known.
+
 Function and method call names extracted from the JS/TS AST. Use this to find framework APIs, server helpers, route declarations, and shared utility usage before scanning source.
 
 ## Top Calls
@@ -29,6 +34,7 @@ Function and method call names extracted from the JS/TS AST. Use this to find fr
 - `Bun.argv.slice` — 1 files
 - `JSON.parse` — 1 files
 - `candidates.push` — 1 files
+- `command.command.slice` — 1 files
 - `contents.replace` — 1 files
 - `copyFileSync` — 1 files
 - `escapeRegExp` — 1 files
@@ -126,6 +132,7 @@ Function and method call names extracted from the JS/TS AST. Use this to find fr
 ### `test/native.test.ts`
 
 - `binaryName`
+- `command.command.slice`
 - `describe`
 - `expect`
 - `findNativeBinary`

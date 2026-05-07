@@ -1,5 +1,10 @@
 # Database Design
 
+## Read Policy
+
+- Tier: `deep-context`
+- Deep-read only. Open when the task requires database design, RLS, RPC, migration timeline, or relationship detail.
+
 pg_query-backed ordered static database map for agents. This reduces migration files in path order for common schema changes without requiring a live database; procedural or dynamic SQL may still need source inspection.
 
 ## Summary

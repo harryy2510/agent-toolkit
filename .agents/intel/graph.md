@@ -13,13 +13,15 @@
 
 ## Import-Heavy Files
 
+- `crates/agent-toolkit-cli/src/main.rs` — 12 imports
 - `crates/agent-toolkit-core/src/intel.rs` — 10 imports
-- `crates/agent-toolkit-cli/src/main.rs` — 9 imports
-- `crates/agent-toolkit-core/src/migrate.rs` — 6 imports
+- `crates/agent-toolkit-core/src/migrate.rs` — 7 imports
+- `crates/agent-toolkit-core/src/dotagent.rs` — 6 imports
 - `test/native.test.ts` — 6 imports
+- `crates/agent-toolkit-core/src/check.rs` — 5 imports
 - `crates/agent-toolkit-core/src/global_setup.rs` — 5 imports
 - `crates/agent-toolkit-core/src/hooks.rs` — 5 imports
-- `crates/agent-toolkit-core/src/check.rs` — 4 imports
+- `crates/agent-toolkit-core/src/supabase.rs` — 4 imports
 - `scripts/build-native.ts` — 4 imports
 - `test/bump-version.test.ts` — 4 imports
 - `crates/agent-toolkit-core/src/fleet.rs` — 3 imports

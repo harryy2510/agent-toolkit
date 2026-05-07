@@ -20,6 +20,6 @@ These are heuristic boundary signals. Use them to avoid crossing client/server/d
 
 ## Environment-Touching Files
 
-- `crates/agent-toolkit-core/src/intel.rs` — 5323 lines — tags: route, api, env
+- `crates/agent-toolkit-core/src/intel.rs` — 5558 lines — tags: route, api, env
 - `scripts/build-native.ts` — 30 lines — tags: env, ast
 

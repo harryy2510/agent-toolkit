@@ -7,6 +7,7 @@ Use this file to avoid broad project scans. Pick the task type, read the listed 
 - Read `overview.md` for stack, scale, high-impact files, generated files, and large modules.
 - Read `tooling.md` before running commands or changing package/config surfaces.
 - Read `graph.md` before touching a high-impact shared module.
+- Do not open `repo.json`, `database.md`, `imports.md`, or `calls.md` unless the current task specifically needs deep structured context.
 
 ## By Task Type
 

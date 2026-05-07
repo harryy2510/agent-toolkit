@@ -5,16 +5,16 @@ Every source-like file discovered by the repo intelligence scanner. Tags are heu
 ## `.`
 
 - `.oxlintrc.json` — 7 lines
-- `AGENTS.md` — 45 lines
+- `AGENTS.md` — 46 lines
 - `Cargo.toml` — 12 lines
-- `README.md` — 439 lines
+- `README.md` — 461 lines
 - `package.json` — 36 lines
 - `tsconfig.json` — 29 lines
 
 ## `.github/workflows`
 
 - `.github/workflows/agent-check.yml` — 29 lines
-- `.github/workflows/release.yml` — 173 lines
+- `.github/workflows/release.yml` — 170 lines
 
 ## `bin`
 
@@ -23,18 +23,20 @@ Every source-like file discovered by the repo intelligence scanner. Tags are heu
 ## `crates/agent-toolkit-cli`
 
 - `crates/agent-toolkit-cli/Cargo.toml` — 13 lines
-- `crates/agent-toolkit-cli/src/main.rs` — 467 lines
+- `crates/agent-toolkit-cli/src/main.rs` — 871 lines
 
 ## `crates/agent-toolkit-core`
 
-- `crates/agent-toolkit-core/Cargo.toml` — 17 lines
-- `crates/agent-toolkit-core/src/check.rs` — 758 lines
+- `crates/agent-toolkit-core/Cargo.toml` — 18 lines
+- `crates/agent-toolkit-core/src/check.rs` — 909 lines
+- `crates/agent-toolkit-core/src/dotagent.rs` — 623 lines
 - `crates/agent-toolkit-core/src/fleet.rs` — 90 lines
-- `crates/agent-toolkit-core/src/global_setup.rs` — 639 lines
-- `crates/agent-toolkit-core/src/hooks.rs` — 489 lines
-- `crates/agent-toolkit-core/src/intel.rs` — 5323 lines — tags: route, api, env
-- `crates/agent-toolkit-core/src/lib.rs` — 6 lines
-- `crates/agent-toolkit-core/src/migrate.rs` — 59 lines
+- `crates/agent-toolkit-core/src/global_setup.rs` — 1129 lines
+- `crates/agent-toolkit-core/src/hooks.rs` — 630 lines
+- `crates/agent-toolkit-core/src/intel.rs` — 5558 lines — tags: route, api, env
+- `crates/agent-toolkit-core/src/lib.rs` — 8 lines
+- `crates/agent-toolkit-core/src/migrate.rs` — 144 lines
+- `crates/agent-toolkit-core/src/supabase.rs` — 127 lines
 
 ## `scripts/build-native.ts`
 
@@ -50,7 +52,7 @@ Every source-like file discovered by the repo intelligence scanner. Tags are heu
 
 ## `src/native.ts`
 
-- `src/native.ts` — 108 lines — tags: ast
+- `src/native.ts` — 114 lines — tags: ast
 
 ## `src/platform.ts`
 
@@ -62,5 +64,5 @@ Every source-like file discovered by the repo intelligence scanner. Tags are heu
 
 ## `test/native.test.ts`
 
-- `test/native.test.ts` — 91 lines — tags: test, ast
+- `test/native.test.ts` — 115 lines — tags: test, ast
 

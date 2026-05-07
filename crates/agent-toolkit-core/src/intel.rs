@@ -17,6 +17,174 @@ pub struct RepoIntel {
     pub file_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IntelReadTier {
+    Entrypoint,
+    ShortIndex,
+    TargetedContext,
+    DeepContext,
+    MachineDeepContext,
+}
+
+impl IntelReadTier {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Entrypoint => "entrypoint",
+            Self::ShortIndex => "short-index",
+            Self::TargetedContext => "targeted-context",
+            Self::DeepContext => "deep-context",
+            Self::MachineDeepContext => "machine-deep-context",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Entrypoint => "Entrypoints",
+            Self::ShortIndex => "Short Indexes",
+            Self::TargetedContext => "Targeted Context",
+            Self::DeepContext => "Deep Context",
+            Self::MachineDeepContext => "Machine Deep Context",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct IntelFileMeta {
+    path: &'static str,
+    description: &'static str,
+    tier: IntelReadTier,
+    read_policy: &'static str,
+}
+
+const INTEL_FILE_META: [IntelFileMeta; 21] = [
+    IntelFileMeta {
+        path: "summary.md",
+        description: "tiny startup index and read policy",
+        tier: IntelReadTier::Entrypoint,
+        read_policy: "Read first. Keep this as the small startup entrypoint before opening task-specific articles.",
+    },
+    IntelFileMeta {
+        path: "index.md",
+        description: "same startup index as summary.md",
+        tier: IntelReadTier::Entrypoint,
+        read_policy: "Read first. Mirrors summary.md for tools that prefer index-style filenames.",
+    },
+    IntelFileMeta {
+        path: "overview.md",
+        description: "architecture, scale, high-impact files",
+        tier: IntelReadTier::ShortIndex,
+        read_policy: "Read early for repo shape, stack signals, hotspots, generated files, and large modules.",
+    },
+    IntelFileMeta {
+        path: "tasks.md",
+        description: "task-oriented read paths so agents know where to start",
+        tier: IntelReadTier::ShortIndex,
+        read_policy: "Read early to pick the smallest task-specific article set instead of scanning broadly.",
+    },
+    IntelFileMeta {
+        path: "tooling.md",
+        description: "scripts, configs, package dependencies",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read when running commands or changing package, tooling, CI, or config surfaces.",
+    },
+    IntelFileMeta {
+        path: "routes.md",
+        description: "framework route files and route-like modules",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read only for route, navigation, page, loader, action, or framework routing work.",
+    },
+    IntelFileMeta {
+        path: "api.md",
+        description: "API handlers, server functions, endpoint declarations",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read only for API, server function, RPC, endpoint, or backend behavior work.",
+    },
+    IntelFileMeta {
+        path: "components.md",
+        description: "UI components and prop surfaces",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read only for component or screen work; large repos may make this file substantial.",
+    },
+    IntelFileMeta {
+        path: "data.md",
+        description: "SQL schema, migrations, Supabase/data files",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read only for data-layer, migration, seed, schema, or Supabase work.",
+    },
+    IntelFileMeta {
+        path: "database.md",
+        description: "pg_query-backed static database design, relationships, RLS, RPCs",
+        tier: IntelReadTier::DeepContext,
+        read_policy: "Deep-read only. Open when the task requires database design, RLS, RPC, migration timeline, or relationship detail.",
+    },
+    IntelFileMeta {
+        path: "graph.md",
+        description: "import graph, blast radius, central modules",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read before broad refactors or changes to high-impact shared modules.",
+    },
+    IntelFileMeta {
+        path: "impact.md",
+        description: "change-impact read plans by high-risk file",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read when editing a high-impact file or planning a shared-module change.",
+    },
+    IntelFileMeta {
+        path: "boundaries.md",
+        description: "client/server/data/generated boundary signals",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read when a task involves runtime boundaries, generated files, env usage, or client/server splits.",
+    },
+    IntelFileMeta {
+        path: "imports.md",
+        description: "local import adjacency grouped by source file",
+        tier: IntelReadTier::DeepContext,
+        read_policy: "Deep-read only. Open for exact dependency tracing after summary, tasks, graph, or impact points to a path.",
+    },
+    IntelFileMeta {
+        path: "calls.md",
+        description: "AST-derived function and method call sites by source file",
+        tier: IntelReadTier::DeepContext,
+        read_policy: "Deep-read only. Open for exact API/call-site tracing after a focused target is known.",
+    },
+    IntelFileMeta {
+        path: "dependencies.md",
+        description: "external imports and package usage",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read when package usage, dependency cleanup, or external API surface matters.",
+    },
+    IntelFileMeta {
+        path: "symbols.md",
+        description: "exported symbols by source file",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read when public exports or symbol ownership matter; avoid using it as startup context.",
+    },
+    IntelFileMeta {
+        path: "files.md",
+        description: "full source-like file inventory with tags",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read when the task needs a full file inventory; avoid using it as startup context.",
+    },
+    IntelFileMeta {
+        path: "env.md",
+        description: "environment variable usage by file",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read for env-name usage only. It must not contain or require live secret values.",
+    },
+    IntelFileMeta {
+        path: "testing.md",
+        description: "tests, coverage signals, test-adjacent files",
+        tier: IntelReadTier::TargetedContext,
+        read_policy: "Read when selecting or changing tests and verification commands.",
+    },
+    IntelFileMeta {
+        path: "repo.json",
+        description: "machine-readable full repo intelligence payload",
+        tier: IntelReadTier::MachineDeepContext,
+        read_policy: "Machine/deep-read only. Do not open during normal startup; use only for tooling or exact structured lookups.",
+    },
+];
+
 #[derive(Debug, Clone)]
 struct RepoAnalysis {
     files: Vec<FileIntel>,
@@ -141,19 +309,29 @@ struct AstFileIntel {
 }
 
 pub fn write_repo_intel(root: &Path) -> std::io::Result<RepoIntel> {
-    let intel = build_repo_intel(root)?;
     let analysis = analyze_repo(root)?;
+    let summary_markdown = render_index(&analysis);
     let intel_dir = root.join(".agents/intel");
     fs::create_dir_all(&intel_dir)?;
 
-    let articles = render_articles(&analysis);
-    for (filename, contents) in articles {
+    let mut rendered_files = vec![("summary.md".to_string(), summary_markdown.clone())];
+    rendered_files.extend(
+        render_articles(&analysis)
+            .into_iter()
+            .map(|(filename, contents)| (filename.to_string(), contents)),
+    );
+    rendered_files.push(("repo.json".to_string(), render_repo_json(&analysis)));
+
+    let manifest = render_manifest_json(&rendered_files);
+    for (filename, contents) in &rendered_files {
         fs::write(intel_dir.join(filename), contents)?;
     }
-    fs::write(intel_dir.join("summary.md"), &intel.summary_markdown)?;
-    fs::write(intel_dir.join("repo.json"), render_repo_json(&analysis))?;
+    fs::write(intel_dir.join("manifest.json"), manifest)?;
 
-    Ok(intel)
+    Ok(RepoIntel {
+        summary_markdown,
+        file_count: analysis.files.len(),
+    })
 }
 
 pub fn build_repo_intel(root: &Path) -> std::io::Result<RepoIntel> {
@@ -296,52 +474,78 @@ fn render_articles(analysis: &RepoAnalysis) -> Vec<(&'static str, String)> {
     ]
 }
 
+fn intel_file_meta(path: &str) -> IntelFileMeta {
+    INTEL_FILE_META
+        .iter()
+        .copied()
+        .find(|meta| meta.path == path)
+        .unwrap_or(IntelFileMeta {
+            path: "unknown",
+            description: "generated repo intelligence file",
+            tier: IntelReadTier::TargetedContext,
+            read_policy: "Read only when the current task requires this generated context.",
+        })
+}
+
+fn render_manifest_json(files: &[(String, String)]) -> String {
+    let mut output = String::from("{\n");
+    output.push_str("\t\"schemaVersion\": 1,\n");
+    output.push_str("\t\"entrypoint\": \"summary.md\",\n");
+    output.push_str("\t\"guidance\": \"Read summary.md first. Open targeted context only for the current task. Treat deep-context files as explicit opt-in reads.\",\n");
+    output.push_str("\t\"files\": [\n");
+    for (index, (path, contents)) in files.iter().enumerate() {
+        let meta = intel_file_meta(path);
+        output.push_str("\t\t{\n");
+        output.push_str(&format!("\t\t\t\"path\": \"{}\",\n", json_escape(path)));
+        output.push_str(&format!("\t\t\t\"tier\": \"{}\",\n", meta.tier.as_str()));
+        output.push_str(&format!("\t\t\t\"bytes\": {},\n", contents.len()));
+        output.push_str(&format!(
+            "\t\t\t\"description\": \"{}\",\n",
+            json_escape(meta.description)
+        ));
+        output.push_str(&format!(
+            "\t\t\t\"readPolicy\": \"{}\"\n",
+            json_escape(meta.read_policy)
+        ));
+        output.push_str("\t\t}");
+        if index + 1 != files.len() {
+            output.push(',');
+        }
+        output.push('\n');
+    }
+    output.push_str("\t]\n");
+    output.push_str("}\n");
+    output
+}
+
 fn render_index(analysis: &RepoAnalysis) -> String {
     let mut output = String::from("# Repository Intelligence\n\n");
     output.push_str("## Preferred Context\n\n");
-    output.push_str("- Use this generated repo intelligence wiki first, then read the source files it points to.\n");
+    output.push_str(
+        "- Start here and keep startup context small; this file is an index, not a source dump.\n",
+    );
+    output.push_str("- Open `overview.md` and `tasks.md` first, then only the targeted article needed for the task.\n");
+    output.push_str(
+        "- Treat `database.md`, `imports.md`, `calls.md`, and `repo.json` as deep-read only.\n",
+    );
     output.push_str("- This index is deterministic and local-only. It is a map, not a substitute for reading implementation before editing.\n\n");
 
-    output.push_str("## Articles\n\n");
-    for (file, description) in [
-        ("overview.md", "architecture, scale, high-impact files"),
-        (
-            "tasks.md",
-            "task-oriented read paths so agents know where to start",
-        ),
-        ("tooling.md", "scripts, configs, package dependencies"),
-        ("routes.md", "framework route files and route-like modules"),
-        (
-            "api.md",
-            "API handlers, server functions, endpoint declarations",
-        ),
-        ("components.md", "UI components and prop surfaces"),
-        ("data.md", "SQL schema, migrations, Supabase/data files"),
-        (
-            "database.md",
-            "pg_query-backed static database design, relationships, RLS, RPCs",
-        ),
-        ("graph.md", "import graph, blast radius, central modules"),
-        ("impact.md", "change-impact read plans by high-risk file"),
-        (
-            "boundaries.md",
-            "client/server/data/generated boundary signals",
-        ),
-        (
-            "imports.md",
-            "local import adjacency grouped by source file",
-        ),
-        (
-            "calls.md",
-            "AST-derived function and method call sites by source file",
-        ),
-        ("dependencies.md", "external imports and package usage"),
-        ("symbols.md", "exported symbols by source file"),
-        ("files.md", "full source-like file inventory with tags"),
-        ("env.md", "environment variable usage by file"),
-        ("testing.md", "tests, coverage signals, test-adjacent files"),
+    output.push_str("## Read Policy\n\n");
+    for tier in [
+        IntelReadTier::Entrypoint,
+        IntelReadTier::ShortIndex,
+        IntelReadTier::TargetedContext,
+        IntelReadTier::DeepContext,
+        IntelReadTier::MachineDeepContext,
     ] {
-        output.push_str(&format!("- [`{file}`](./{file}) — {description}\n"));
+        output.push_str(&format!("### {}\n\n", tier.label()));
+        for meta in INTEL_FILE_META.iter().filter(|meta| meta.tier == tier) {
+            output.push_str(&format!(
+                "- [`{}`](./{}) — {}\n",
+                meta.path, meta.path, meta.description
+            ));
+        }
+        output.push('\n');
     }
 
     output.push_str("\n## Quick Stats\n\n");
@@ -465,7 +669,8 @@ fn render_tasks(analysis: &RepoAnalysis) -> String {
     output.push_str(
         "- Read `tooling.md` before running commands or changing package/config surfaces.\n",
     );
-    output.push_str("- Read `graph.md` before touching a high-impact shared module.\n\n");
+    output.push_str("- Read `graph.md` before touching a high-impact shared module.\n");
+    output.push_str("- Do not open `repo.json`, `database.md`, `imports.md`, or `calls.md` unless the current task specifically needs deep structured context.\n\n");
 
     output.push_str("## By Task Type\n\n");
     for (task, article, reason) in [
@@ -691,6 +896,7 @@ fn render_database(analysis: &RepoAnalysis) -> String {
         .filter(|file| file.extension == "sql")
         .collect();
     let mut output = String::from("# Database Design\n\n");
+    push_article_read_policy(&mut output, "database.md");
     output.push_str("pg_query-backed ordered static database map for agents. This reduces migration files in path order for common schema changes without requiring a live database; procedural or dynamic SQL may still need source inspection.\n\n");
 
     output.push_str("## Summary\n\n");
@@ -1013,6 +1219,7 @@ fn render_boundaries(analysis: &RepoAnalysis) -> String {
 
 fn render_imports(analysis: &RepoAnalysis) -> String {
     let mut output = String::from("# Local Imports\n\n");
+    push_article_read_policy(&mut output, "imports.md");
     output.push_str("Local import adjacency grouped by source file. Use this to follow dependencies without scanning the project.\n\n");
     let mut by_from: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for edge in &analysis.local_edges {
@@ -1037,6 +1244,7 @@ fn render_imports(analysis: &RepoAnalysis) -> String {
 
 fn render_calls(analysis: &RepoAnalysis) -> String {
     let mut output = String::from("# Call Sites\n\n");
+    push_article_read_policy(&mut output, "calls.md");
     output.push_str("Function and method call names extracted from the JS/TS AST. Use this to find framework APIs, server helpers, route declarations, and shared utility usage before scanning source.\n\n");
 
     let mut usage: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -4567,11 +4775,21 @@ fn display_or_none(items: &[String]) -> String {
 
 fn push_read_first(output: &mut String) {
     output.push_str("## How To Use\n\n");
-    output
-        .push_str("- Start with `overview.md`, then jump to the article that matches your task.\n");
+    output.push_str("- Start with `summary.md`, `overview.md`, and `tasks.md`, then jump to the article that matches your task.\n");
     output.push_str("- For behavior changes, read the listed source files before editing.\n");
     output.push_str("- For broad refactors, inspect `graph.md` high-impact files first.\n");
     output.push_str("- For framework-specific work, prefer the matching route/API/component/data article over global search.\n");
+    output.push_str("- Do not bulk-read deep context files such as `repo.json`, `database.md`, `imports.md`, or `calls.md` unless the task specifically requires them.\n");
+}
+
+fn push_article_read_policy(output: &mut String, path: &str) {
+    let meta = intel_file_meta(path);
+    output.push_str("## Read Policy\n\n");
+    output.push_str(&format!(
+        "- Tier: `{}`\n- {}\n\n",
+        meta.tier.as_str(),
+        meta.read_policy
+    ));
 }
 
 fn json_string_array(items: &[String]) -> String {
@@ -4896,6 +5114,10 @@ mod tests {
         assert_eq!(intel.file_count, 0);
         assert!(intel.summary_markdown.contains("overview.md"));
         assert!(intel.summary_markdown.contains("graph.md"));
+        assert!(intel.summary_markdown.contains("Deep Context"));
+        assert!(intel
+            .summary_markdown
+            .contains("database.md`, `imports.md`, `calls.md`, and `repo.json"));
     }
 
     #[test]
@@ -4965,9 +5187,18 @@ mod tests {
             "testing.md",
             "summary.md",
             "repo.json",
+            "manifest.json",
         ] {
             assert!(root.join(".agents/intel").join(file).exists(), "{file}");
         }
+        let summary = fs::read_to_string(root.join(".agents/intel/summary.md")).unwrap();
+        assert!(summary.contains("Treat `database.md`, `imports.md`, `calls.md`, and `repo.json`"));
+        let database = fs::read_to_string(root.join(".agents/intel/database.md")).unwrap();
+        assert!(database.contains("Tier: `deep-context`"));
+        let manifest = fs::read_to_string(root.join(".agents/intel/manifest.json")).unwrap();
+        assert!(manifest.contains("\"entrypoint\": \"summary.md\""));
+        assert!(manifest.contains("\"path\": \"repo.json\""));
+        assert!(manifest.contains("\"tier\": \"machine-deep-context\""));
     }
 
     #[test]

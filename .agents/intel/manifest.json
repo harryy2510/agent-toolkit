@@ -1,0 +1,154 @@
+{
+	"schemaVersion": 1,
+	"entrypoint": "summary.md",
+	"guidance": "Read summary.md first. Open targeted context only for the current task. Treat deep-context files as explicit opt-in reads.",
+	"files": [
+		{
+			"path": "summary.md",
+			"tier": "entrypoint",
+			"bytes": 2931,
+			"description": "tiny startup index and read policy",
+			"readPolicy": "Read first. Keep this as the small startup entrypoint before opening task-specific articles."
+		},
+		{
+			"path": "index.md",
+			"tier": "entrypoint",
+			"bytes": 2931,
+			"description": "same startup index as summary.md",
+			"readPolicy": "Read first. Mirrors summary.md for tools that prefer index-style filenames."
+		},
+		{
+			"path": "overview.md",
+			"tier": "short-index",
+			"bytes": 3239,
+			"description": "architecture, scale, high-impact files",
+			"readPolicy": "Read early for repo shape, stack signals, hotspots, generated files, and large modules."
+		},
+		{
+			"path": "tasks.md",
+			"tier": "short-index",
+			"bytes": 1843,
+			"description": "task-oriented read paths so agents know where to start",
+			"readPolicy": "Read early to pick the smallest task-specific article set instead of scanning broadly."
+		},
+		{
+			"path": "tooling.md",
+			"tier": "targeted-context",
+			"bytes": 330,
+			"description": "scripts, configs, package dependencies",
+			"readPolicy": "Read when running commands or changing package, tooling, CI, or config surfaces."
+		},
+		{
+			"path": "routes.md",
+			"tier": "targeted-context",
+			"bytes": 116,
+			"description": "framework route files and route-like modules",
+			"readPolicy": "Read only for route, navigation, page, loader, action, or framework routing work."
+		},
+		{
+			"path": "api.md",
+			"tier": "targeted-context",
+			"bytes": 134,
+			"description": "API handlers, server functions, endpoint declarations",
+			"readPolicy": "Read only for API, server function, RPC, endpoint, or backend behavior work."
+		},
+		{
+			"path": "components.md",
+			"tier": "targeted-context",
+			"bytes": 48,
+			"description": "UI components and prop surfaces",
+			"readPolicy": "Read only for component or screen work; large repos may make this file substantial."
+		},
+		{
+			"path": "data.md",
+			"tier": "targeted-context",
+			"bytes": 44,
+			"description": "SQL schema, migrations, Supabase/data files",
+			"readPolicy": "Read only for data-layer, migration, seed, schema, or Supabase work."
+		},
+		{
+			"path": "database.md",
+			"tier": "deep-context",
+			"bytes": 721,
+			"description": "pg_query-backed static database design, relationships, RLS, RPCs",
+			"readPolicy": "Deep-read only. Open when the task requires database design, RLS, RPC, migration timeline, or relationship detail."
+		},
+		{
+			"path": "graph.md",
+			"tier": "targeted-context",
+			"bytes": 1326,
+			"description": "import graph, blast radius, central modules",
+			"readPolicy": "Read before broad refactors or changes to high-impact shared modules."
+		},
+		{
+			"path": "impact.md",
+			"tier": "targeted-context",
+			"bytes": 967,
+			"description": "change-impact read plans by high-risk file",
+			"readPolicy": "Read when editing a high-impact file or planning a shared-module change."
+		},
+		{
+			"path": "boundaries.md",
+			"tier": "targeted-context",
+			"bytes": 497,
+			"description": "client/server/data/generated boundary signals",
+			"readPolicy": "Read when a task involves runtime boundaries, generated files, env usage, or client/server splits."
+		},
+		{
+			"path": "imports.md",
+			"tier": "deep-context",
+			"bytes": 512,
+			"description": "local import adjacency grouped by source file",
+			"readPolicy": "Deep-read only. Open for exact dependency tracing after summary, tasks, graph, or impact points to a path."
+		},
+		{
+			"path": "calls.md",
+			"tier": "deep-context",
+			"bytes": 2991,
+			"description": "AST-derived function and method call sites by source file",
+			"readPolicy": "Deep-read only. Open for exact API/call-site tracing after a focused target is known."
+		},
+		{
+			"path": "dependencies.md",
+			"tier": "targeted-context",
+			"bytes": 5178,
+			"description": "external imports and package usage",
+			"readPolicy": "Read when package usage, dependency cleanup, or external API surface matters."
+		},
+		{
+			"path": "symbols.md",
+			"tier": "targeted-context",
+			"bytes": 1560,
+			"description": "exported symbols by source file",
+			"readPolicy": "Read when public exports or symbol ownership matter; avoid using it as startup context."
+		},
+		{
+			"path": "files.md",
+			"tier": "targeted-context",
+			"bytes": 1839,
+			"description": "full source-like file inventory with tags",
+			"readPolicy": "Read when the task needs a full file inventory; avoid using it as startup context."
+		},
+		{
+			"path": "env.md",
+			"tier": "targeted-context",
+			"bytes": 207,
+			"description": "environment variable usage by file",
+			"readPolicy": "Read for env-name usage only. It must not contain or require live secret values."
+		},
+		{
+			"path": "testing.md",
+			"tier": "targeted-context",
+			"bytes": 167,
+			"description": "tests, coverage signals, test-adjacent files",
+			"readPolicy": "Read when selecting or changing tests and verification commands."
+		},
+		{
+			"path": "repo.json",
+			"tier": "machine-deep-context",
+			"bytes": 6758,
+			"description": "machine-readable full repo intelligence payload",
+			"readPolicy": "Machine/deep-read only. Do not open during normal startup; use only for tooling or exact structured lookups."
+		}
+	]
+}
