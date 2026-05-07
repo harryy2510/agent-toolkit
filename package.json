@@ -1,6 +1,6 @@
 {
 	"name": "@harryy/agent-toolkit",
-	"version": "0.1.21",
+	"version": "0.1.22",
 	"description": "Fast agent-agnostic setup, repo intelligence, and enforcement CLI.",
 	"type": "module",
 	"bin": {

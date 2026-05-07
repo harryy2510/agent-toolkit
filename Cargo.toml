@@ -9,4 +9,4 @@ members = [
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/harryy2510/agent-toolkit"
-version = "0.1.21"
+version = "0.1.22"
