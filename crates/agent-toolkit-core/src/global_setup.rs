@@ -12,6 +12,13 @@ pub struct GlobalSetupResult {
     pub skipped_extensions: Vec<GlobalSetupExtensionSkip>,
 }
 
+pub struct GlobalTeardownResult {
+    pub updated_files: Vec<PathBuf>,
+    pub updated_codex_marketplaces: Vec<PathBuf>,
+    pub removed_extensions: Vec<PathBuf>,
+    pub skipped_extensions: Vec<GlobalSetupExtensionSkip>,
+}
+
 pub struct GlobalSetupExtensionSkip {
     pub source: PathBuf,
     pub reason: String,
@@ -29,6 +36,11 @@ pub struct GlobalSetupOptions {
     pub all: bool,
     pub include_gemini: bool,
     pub detection: AgentDetection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlobalTeardownOptions {
+    pub include_gemini: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -204,6 +216,52 @@ pub fn apply_global_setup_plan(plan: &GlobalSetupPlan) -> std::io::Result<Global
     apply_global_setup_plan_with_gemini_command(plan, "gemini")
 }
 
+pub fn teardown_global_rules(
+    home: &Path,
+    options: GlobalTeardownOptions,
+) -> std::io::Result<GlobalTeardownResult> {
+    let mut updated_files = Vec::new();
+    let mut updated_codex_marketplaces = Vec::new();
+    let mut removed_extensions = Vec::new();
+    let mut skipped_extensions = Vec::new();
+
+    for path in [
+        home.join(".claude/CLAUDE.md"),
+        home.join(".codex/AGENTS.md"),
+    ] {
+        if remove_file_block(&path, "DOTAGENT")? {
+            updated_files.push(path);
+        }
+    }
+
+    let codex_config = home.join(".codex/config.toml");
+    if remove_codex_marketplace_config(&codex_config)? {
+        updated_codex_marketplaces.push(codex_config);
+    }
+
+    if options.include_gemini {
+        let extension = home.join(".gemini/extensions/dotagent");
+        if extension.exists() {
+            if is_any_dotagent_gemini_extension_linked(&extension) {
+                fs::remove_dir_all(&extension)?;
+                removed_extensions.push(extension);
+            } else {
+                skipped_extensions.push(GlobalSetupExtensionSkip {
+                    source: extension,
+                    reason: "Gemini extension was not installed as a DotAgent link".to_string(),
+                });
+            }
+        }
+    }
+
+    Ok(GlobalTeardownResult {
+        updated_files,
+        updated_codex_marketplaces,
+        removed_extensions,
+        skipped_extensions,
+    })
+}
+
 fn apply_global_setup_plan_with_gemini_command(
     plan: &GlobalSetupPlan,
     gemini_command: &str,
@@ -285,6 +343,17 @@ fn is_dotagent_gemini_extension_linked(path: &Path, source: &Path) -> bool {
     contents.contains("\"type\": \"link\"") && contents_references_path(&contents, source)
 }
 
+fn is_any_dotagent_gemini_extension_linked(path: &Path) -> bool {
+    let install_metadata = path.join(".gemini-extension-install.json");
+    let Ok(contents) = fs::read_to_string(install_metadata) else {
+        return false;
+    };
+    let normalized_contents = normalize_path_separators(&contents);
+
+    contents.contains("\"type\": \"link\"")
+        && normalized_contents.contains("plugins/dotagent/gemini-extension")
+}
+
 fn contents_references_path(contents: &str, path: &Path) -> bool {
     let path = path.to_string_lossy();
     let normalized_path = normalize_path_separators(&path);
@@ -327,6 +396,35 @@ pub fn upsert_managed_block(existing: &str, id: &str, content: &str) -> String {
     result
 }
 
+pub fn remove_managed_block(existing: &str, id: &str) -> String {
+    let start = start_marker(id);
+    let end = end_marker(id);
+
+    let Some(start_index) = existing.find(&start) else {
+        return existing.to_string();
+    };
+    let Some(relative_end_index) = existing[start_index..].find(&end) else {
+        return existing.to_string();
+    };
+    let end_index = start_index + relative_end_index + end.len();
+    join_removed_block_parts(&existing[..start_index], &existing[end_index..])
+}
+
+fn join_removed_block_parts(before: &str, after: &str) -> String {
+    let before = before.trim_end();
+    let after = after.trim_start_matches('\n').trim_end();
+    if before.is_empty() && after.is_empty() {
+        return String::new();
+    }
+    if before.is_empty() {
+        return format!("{after}\n");
+    }
+    if after.is_empty() {
+        return format!("{before}\n");
+    }
+    format!("{before}\n\n{after}\n")
+}
+
 fn upsert_file_block(path: &Path, id: &str, content: &str) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -334,6 +432,20 @@ fn upsert_file_block(path: &Path, id: &str, content: &str) -> std::io::Result<()
     let existing = fs::read_to_string(path).unwrap_or_default();
     remove_broken_symlink(path)?;
     fs::write(path, upsert_managed_block(&existing, id, content))
+}
+
+fn remove_file_block(path: &Path, id: &str) -> std::io::Result<bool> {
+    if !path.exists() {
+        return Ok(false);
+    }
+    let existing = fs::read_to_string(path)?;
+    let updated = remove_managed_block(&existing, id);
+    if updated == existing {
+        return Ok(false);
+    }
+    remove_broken_symlink(path)?;
+    fs::write(path, updated)?;
+    Ok(true)
 }
 
 fn remove_broken_symlink(path: &Path) -> std::io::Result<()> {
@@ -356,6 +468,20 @@ fn upsert_codex_marketplace_config(path: &Path, source: &Path) -> std::io::Resul
     let existing = fs::read_to_string(path).unwrap_or_default();
     remove_broken_symlink(path)?;
     fs::write(path, upsert_codex_marketplace(&existing, source))
+}
+
+fn remove_codex_marketplace_config(path: &Path) -> std::io::Result<bool> {
+    if !path.exists() {
+        return Ok(false);
+    }
+    let existing = fs::read_to_string(path)?;
+    let updated = remove_codex_marketplace(&existing);
+    if updated == existing {
+        return Ok(false);
+    }
+    remove_broken_symlink(path)?;
+    fs::write(path, updated)?;
+    Ok(true)
 }
 
 pub fn upsert_codex_marketplace(existing: &str, source: &Path) -> String {
@@ -392,6 +518,34 @@ pub fn upsert_codex_marketplace(existing: &str, source: &Path) -> String {
     result.push_str("source_type = \"local\"\n");
     result.push_str(&format!("source = \"{source}\"\n"));
     result
+}
+
+pub fn remove_codex_marketplace(existing: &str) -> String {
+    let mut output = String::new();
+    let mut skipping_dotagent = false;
+
+    for line in existing.lines() {
+        if line.trim() == "[marketplaces.dotagent]" {
+            skipping_dotagent = true;
+            continue;
+        }
+
+        if skipping_dotagent && line.trim_start().starts_with('[') {
+            skipping_dotagent = false;
+        }
+
+        if !skipping_dotagent {
+            output.push_str(line);
+            output.push('\n');
+        }
+    }
+
+    let trimmed = output.trim_end();
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        format!("{trimmed}\n")
+    }
 }
 
 fn push_managed_rules_action(
@@ -525,6 +679,106 @@ trust_level = "trusted"
         assert!(result.contains("[projects.\"/repo\"]"));
         assert!(result.contains("trust_level = \"trusted\""));
         assert!(!result.contains("/old"));
+    }
+
+    #[test]
+    fn remove_managed_block_preserves_user_content() {
+        let existing =
+            upsert_managed_block("# User Rules\n\nKeep this.\n", "DOTAGENT", "# Shared\n");
+        let result = remove_managed_block(&existing, "DOTAGENT");
+
+        assert!(result.contains("# User Rules"));
+        assert!(result.contains("Keep this."));
+        assert!(!result.contains("AGENT-TOOLKIT:DOTAGENT:START"));
+        assert!(!result.contains("# Shared"));
+    }
+
+    #[test]
+    fn remove_codex_marketplace_preserves_other_tables() {
+        let existing = upsert_codex_marketplace(
+            r#"approval_policy = "on-request"
+
+[marketplaces.other]
+source_type = "local"
+source = "/other"
+"#,
+            Path::new("/dotagent"),
+        );
+        let result = remove_codex_marketplace(&existing);
+
+        assert!(result.contains("approval_policy = \"on-request\""));
+        assert!(result.contains("[marketplaces.other]"));
+        assert!(!result.contains("[marketplaces.dotagent]"));
+        assert!(!result.contains("/dotagent"));
+    }
+
+    #[test]
+    fn teardown_global_rules_removes_only_managed_global_artifacts() {
+        let root = temp_dir("agent-toolkit-global-teardown");
+        let home = root.join("home");
+        fs::create_dir_all(home.join(".claude")).unwrap();
+        fs::create_dir_all(home.join(".codex")).unwrap();
+        fs::create_dir_all(home.join(".gemini/extensions/dotagent")).unwrap();
+        fs::write(
+            home.join(".claude/CLAUDE.md"),
+            upsert_managed_block("# My Claude Rules\n", "DOTAGENT", "# Shared\n"),
+        )
+        .unwrap();
+        fs::write(
+            home.join(".codex/AGENTS.md"),
+            upsert_managed_block("# My Codex Rules\n", "DOTAGENT", "# Shared\n"),
+        )
+        .unwrap();
+        fs::write(
+            home.join(".codex/config.toml"),
+            upsert_codex_marketplace(
+                "approval_policy = \"on-request\"\n",
+                Path::new("/Users/example/.agent-toolkit/plugins/dotagent"),
+            ),
+        )
+        .unwrap();
+        fs::write(
+            home.join(".gemini/extensions/dotagent/.gemini-extension-install.json"),
+            r#"{
+  "source": "/Users/example/.agent-toolkit/plugins/dotagent/plugins/dotagent/gemini-extension",
+  "type": "link"
+}"#,
+        )
+        .unwrap();
+
+        let result = teardown_global_rules(
+            &home,
+            GlobalTeardownOptions {
+                include_gemini: true,
+            },
+        )
+        .unwrap();
+        let claude = fs::read_to_string(home.join(".claude/CLAUDE.md")).unwrap();
+        let codex = fs::read_to_string(home.join(".codex/AGENTS.md")).unwrap();
+        let config = fs::read_to_string(home.join(".codex/config.toml")).unwrap();
+
+        assert_eq!(
+            result.updated_files,
+            vec![
+                home.join(".claude/CLAUDE.md"),
+                home.join(".codex/AGENTS.md")
+            ]
+        );
+        assert_eq!(
+            result.updated_codex_marketplaces,
+            vec![home.join(".codex/config.toml")]
+        );
+        assert_eq!(
+            result.removed_extensions,
+            vec![home.join(".gemini/extensions/dotagent")]
+        );
+        assert!(claude.contains("# My Claude Rules"));
+        assert!(!claude.contains("AGENT-TOOLKIT:DOTAGENT"));
+        assert!(codex.contains("# My Codex Rules"));
+        assert!(!codex.contains("AGENT-TOOLKIT:DOTAGENT"));
+        assert!(config.contains("approval_policy = \"on-request\""));
+        assert!(!config.contains("[marketplaces.dotagent]"));
+        assert!(!home.join(".gemini/extensions/dotagent").exists());
     }
 
     #[test]

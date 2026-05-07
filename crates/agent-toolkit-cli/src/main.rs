@@ -7,7 +7,7 @@ use agent_toolkit_core::dotagent::{install_repo_dotagent_with_options, RepoDotAg
 use agent_toolkit_core::fleet::discover_git_repos;
 use agent_toolkit_core::global_setup::{
     apply_global_setup_plan, build_global_setup_plan, default_global_setup_options,
-    GlobalSetupActionKind,
+    teardown_global_rules, GlobalSetupActionKind, GlobalTeardownOptions,
 };
 use agent_toolkit_core::hooks::bootstrap_repo;
 use agent_toolkit_core::intel::write_repo_intel;
@@ -150,6 +150,7 @@ fn run() -> Result<(), String> {
         }
         [command, rest @ ..] if command == "setup" => run_setup(rest),
         [command, rest @ ..] if command == "update" => run_update(rest),
+        [command, rest @ ..] if command == "teardown" => run_teardown(rest),
         [scope, command, roots @ ..] if scope == "fleet" && command == "scan" => {
             let paths = if roots.is_empty() {
                 vec![env::current_dir().map_err(|error| error.to_string())?]
@@ -280,7 +281,7 @@ fn run() -> Result<(), String> {
 
 fn print_help() {
     println!(
-		"agent-toolkit\n\nCommands:\n  setup [flags]       Install global managed agent rules\n  update [flags]      Update DotAgent source and reapply global managed rules\n  repo setup [flags]  Bootstrap, write repo intelligence, install DotAgent, sync, and check\n  repo migrate [flags] Alias for repo setup\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nRepo setup flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches\n  --skip-sync               Do not run agents sync after writing repo files\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
+		"agent-toolkit\n\nCommands:\n  setup [flags]       Install personal managed agent rules\n  update [flags]      Update DotAgent source and reapply personal managed rules\n  teardown [flags]    Remove personal managed agent rules\n  repo setup [flags]  Bootstrap, write repo intelligence, install DotAgent, sync, and check\n  repo migrate [flags] Alias for repo setup\n  repo intel          Build repository intelligence wiki\n  repo check          Run agent/tooling enforcement checks\n  repo bootstrap      Add AGENTS.md, .agents config, and git hooks\n  repo dotagent [flags] Pin DotAgent rules and skills into the current repo\n  repo sync [--check] Run agents sync for the current repo\n  repo-intel          Alias for repo intel\n  fleet scan [dir]    Find git repositories\n  fleet check [dir]   Run repo checks across discovered git repositories\n  fleet bootstrap     Bootstrap every discovered git repository\n  fleet migrate       Migrate every discovered git repository\n  fleet sync          Run agents sync across discovered git repositories\n  commit-msg <file>   Validate Conventional Commit message\n\nSetup/update flags:\n  --dry-run                  Print the setup plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --all                     Configure all supported agents\n  --skip-gemini             Do not link the Gemini extension\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n\nTeardown flags:\n  --dry-run                  Print the teardown plan without changing files\n  --yes, -y                  Apply without an interactive confirmation\n  --skip-gemini             Do not remove the Gemini extension link\n\nRepo setup flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches\n  --skip-sync               Do not run agents sync after writing repo files\n\nRepo DotAgent flags:\n  --dotagent-source <path>  Use an existing local DotAgent checkout\n  --force                   Recopy DotAgent files even when the locked version/revision matches"
 	);
 }
 
@@ -379,7 +380,7 @@ fn run_setup(args: &[String]) -> Result<(), String> {
     }
 
     if !cli_options.yes && !confirm_setup()? {
-        println!("global setup aborted");
+        println!("setup aborted");
         return Ok(());
     }
 
@@ -406,7 +407,7 @@ fn run_setup(args: &[String]) -> Result<(), String> {
             skipped.reason
         );
     }
-    println!("global setup complete");
+    println!("setup complete");
     Ok(())
 }
 
@@ -419,6 +420,47 @@ fn run_update(args: &[String]) -> Result<(), String> {
         setup_args.push("--yes".to_string());
     }
     run_setup(&setup_args)
+}
+
+fn run_teardown(args: &[String]) -> Result<(), String> {
+    let options = parse_teardown_args(args)?;
+    let home = home_dir()?;
+    print_teardown_plan(&home, !options.skip_gemini);
+
+    if options.dry_run {
+        return Ok(());
+    }
+
+    if !options.yes && !confirm_teardown()? {
+        println!("teardown aborted");
+        return Ok(());
+    }
+
+    let result = teardown_global_rules(
+        &home,
+        GlobalTeardownOptions {
+            include_gemini: !options.skip_gemini,
+        },
+    )
+    .map_err(|error| error.to_string())?;
+    for path in result.updated_files {
+        println!("removed managed rules from {}", path.display());
+    }
+    for path in result.updated_codex_marketplaces {
+        println!("removed Codex marketplace from {}", path.display());
+    }
+    for path in result.removed_extensions {
+        println!("removed Gemini extension {}", path.display());
+    }
+    for skipped in result.skipped_extensions {
+        println!(
+            "skipped Gemini extension {}: {}",
+            skipped.source.display(),
+            skipped.reason
+        );
+    }
+    println!("teardown complete");
+    Ok(())
 }
 
 fn run_repo_setup(command: &str, args: &[String]) -> Result<(), String> {
@@ -489,6 +531,13 @@ struct SetupCliOptions {
     dotagent_source: Option<PathBuf>,
 }
 
+#[derive(Debug, Default)]
+struct TeardownCliOptions {
+    yes: bool,
+    dry_run: bool,
+    skip_gemini: bool,
+}
+
 fn parse_setup_args(args: &[String]) -> Result<SetupCliOptions, String> {
     let mut options = SetupCliOptions::default();
     let mut index = 0;
@@ -508,6 +557,19 @@ fn parse_setup_args(args: &[String]) -> Result<SetupCliOptions, String> {
             flag => return Err(format!("unknown setup flag: {flag}")),
         }
         index += 1;
+    }
+    Ok(options)
+}
+
+fn parse_teardown_args(args: &[String]) -> Result<TeardownCliOptions, String> {
+    let mut options = TeardownCliOptions::default();
+    for arg in args {
+        match arg.as_str() {
+            "--yes" | "-y" => options.yes = true,
+            "--dry-run" => options.dry_run = true,
+            "--skip-gemini" => options.skip_gemini = true,
+            flag => return Err(format!("unknown teardown flag: {flag}")),
+        }
     }
     Ok(options)
 }
@@ -612,7 +674,7 @@ fn run_agents_sync(root: &std::path::Path, check: bool) -> Result<(), String> {
 }
 
 fn print_setup_plan(plan: &agent_toolkit_core::global_setup::GlobalSetupPlan) {
-    println!("Global setup plan");
+    println!("Setup plan");
     println!("source {}", plan.dotagent_repo.display());
     if plan.actions.is_empty() {
         println!("actions none");
@@ -671,8 +733,44 @@ fn print_setup_plan(plan: &agent_toolkit_core::global_setup::GlobalSetupPlan) {
     }
 }
 
+fn print_teardown_plan(home: &Path, include_gemini: bool) {
+    println!("Teardown plan");
+    println!(
+        "action Claude: Remove managed rules block -> {}",
+        home.join(".claude/CLAUDE.md").display()
+    );
+    println!(
+        "action Codex: Remove managed rules block -> {}",
+        home.join(".codex/AGENTS.md").display()
+    );
+    println!(
+        "action Codex: Remove DotAgent local marketplace -> {}",
+        home.join(".codex/config.toml").display()
+    );
+    if include_gemini {
+        println!(
+            "action Gemini: Remove DotAgent extension link -> {}",
+            home.join(".gemini/extensions/dotagent").display()
+        );
+    } else {
+        println!("skip Gemini: disabled by --skip-gemini");
+    }
+}
+
 fn confirm_setup() -> Result<bool, String> {
-    print!("Proceed with global setup? [y/N] ");
+    print!("Proceed with setup? [y/N] ");
+    std::io::stdout()
+        .flush()
+        .map_err(|error| error.to_string())?;
+    let mut answer = String::new();
+    std::io::stdin()
+        .read_line(&mut answer)
+        .map_err(|error| error.to_string())?;
+    Ok(matches!(answer.trim(), "y" | "Y" | "yes" | "YES"))
+}
+
+fn confirm_teardown() -> Result<bool, String> {
+    print!("Proceed with teardown? [y/N] ");
     std::io::stdout()
         .flush()
         .map_err(|error| error.to_string())?;
@@ -739,5 +837,19 @@ mod tests {
         );
         assert!(options.force_dotagent);
         assert!(options.skip_sync);
+    }
+
+    #[test]
+    fn parse_teardown_args_supports_yes_dry_run_and_skip_gemini() {
+        let options = parse_teardown_args(&[
+            "--yes".to_string(),
+            "--dry-run".to_string(),
+            "--skip-gemini".to_string(),
+        ])
+        .unwrap();
+
+        assert!(options.yes);
+        assert!(options.dry_run);
+        assert!(options.skip_gemini);
     }
 }

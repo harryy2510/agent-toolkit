@@ -58,17 +58,19 @@ bunx @harryy/agent-toolkit repo setup
 
 `repo setup` bootstraps the repo, writes `.agents/intel/`, pins the DotAgent rules into root `AGENTS.md`, vendors DotAgent skills into `.agents/skills/`, copies role-profile and command references under `.agents/dotagent/`, runs `agents sync --path .`, and checks the repo. Commit those repo files so new contributors get the same rules and skills from `git clone`. Later runs use the lock's DotAgent version and git revision as the normal no-op gate; use `repo setup --force` only when you need to recopy the same snapshot. Use `repo setup --skip-sync` when `@agents-dev/cli` is not available.
 
-Install or preview the personal global setup when you want the same defaults outside an agentized repo:
+Install, update, or remove personal defaults outside an agentized repo:
 
 ```bash
 bunx @harryy/agent-toolkit setup --dry-run
 bunx @harryy/agent-toolkit setup --yes
 bunx @harryy/agent-toolkit update
+bunx @harryy/agent-toolkit teardown --dry-run
+bunx @harryy/agent-toolkit teardown --yes
 ```
 
 End users need Bun only. Rust is not required for normal use because the published package ships prebuilt native binaries.
 
-`setup` installs the shared rules plugin, preserves existing user rules, and inserts managed Agent Toolkit blocks where supported. This is a personal convenience layer, not the team source of truth. `update` pulls the latest DotAgent source and reapplies the packaged global rules without an extra prompt:
+`setup` installs the shared rules plugin, preserves existing user rules, and inserts managed Agent Toolkit blocks where supported. This is a personal convenience layer, not the team source of truth. `update` pulls the latest DotAgent source and reapplies the packaged personal rules without an extra prompt. `teardown` removes only managed Agent Toolkit blocks and registrations:
 
 - Codex: `~/.codex/AGENTS.md`
 - Claude Code: `~/.claude/CLAUDE.md`
@@ -80,8 +82,11 @@ Useful setup flags:
 bunx @harryy/agent-toolkit setup --dry-run
 bunx @harryy/agent-toolkit setup --yes
 bunx @harryy/agent-toolkit update
+bunx @harryy/agent-toolkit teardown --dry-run
+bunx @harryy/agent-toolkit teardown --yes
 bunx @harryy/agent-toolkit setup --all --yes
 bunx @harryy/agent-toolkit setup --skip-gemini --yes
+bunx @harryy/agent-toolkit teardown --skip-gemini --yes
 ```
 
 Repo setup:
