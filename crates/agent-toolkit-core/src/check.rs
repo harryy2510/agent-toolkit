@@ -86,6 +86,13 @@ pub fn check_repo(root: &Path) -> Vec<RepoIssue> {
         "Conventional Commit",
         "repo Husky commit-msg hook must enforce Conventional Commit messages",
     );
+    push_missing_hook_issue(
+        &mut issues,
+        root,
+        ".husky/post-checkout",
+        "bun install",
+        "repo Husky post-checkout hook must run bun install",
+    );
 
     push_disallowed_tracked_file_issues(root, &mut issues);
 
@@ -892,6 +899,11 @@ mod tests {
         fs::write(
             root.join(".husky/commit-msg"),
             "#!/bin/sh\necho \"Conventional Commit\"\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join(".husky/post-checkout"),
+            "#!/bin/sh\nbun install\n",
         )
         .unwrap();
     }

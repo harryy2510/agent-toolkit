@@ -95,11 +95,20 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
         commit_msg_agent_check_block(),
         &mut changes,
     )?;
+    ensure_hook(
+        root,
+        ".husky/post-checkout",
+        post_checkout_hook(),
+        "bun install",
+        post_checkout_agent_check_block(),
+        &mut changes,
+    )?;
     ensure_gitignore_entries(root, &mut changes)?;
     make_executable(root.join("scripts/agent-check").as_path())?;
     make_executable(root.join(".husky/pre-commit").as_path())?;
     make_executable(root.join(".husky/pre-push").as_path())?;
     make_executable(root.join(".husky/commit-msg").as_path())?;
+    make_executable(root.join(".husky/post-checkout").as_path())?;
     configure_git_hooks_path(root);
     Ok(changes)
 }
@@ -130,6 +139,10 @@ fn pre_push_hook() -> &'static str {
     "#!/bin/sh\nset -eu\n\nscripts/agent-check\n"
 }
 
+fn post_checkout_hook() -> &'static str {
+    "#!/bin/sh\nset -eu\n\nbun install\n"
+}
+
 fn pre_commit_agent_check_block() -> &'static str {
     "# agent-toolkit:start\nscripts/agent-check --staged\n# agent-toolkit:end\n"
 }
@@ -140,6 +153,10 @@ fn pre_push_agent_check_block() -> &'static str {
 
 fn commit_msg_agent_check_block() -> &'static str {
     "# agent-toolkit:start\nfirst_line=$(sed -n '1p' \"$1\")\n\nif ! printf '%s\\n' \"$first_line\" | grep -Eq '^[a-z0-9-]+(\\([a-z0-9._/-]+\\))?!?: .+'; then\n\techo \"Commit message must use Conventional Commit format, for example: feat: add repo intelligence\" >&2\n\texit 1\nfi\n# agent-toolkit:end\n"
+}
+
+fn post_checkout_agent_check_block() -> &'static str {
+    "# agent-toolkit:start\nbun install\n# agent-toolkit:end\n"
 }
 
 fn agent_check_script() -> &'static str {
@@ -466,10 +483,16 @@ mod tests {
         ));
         assert!(has_change(
             &changes,
+            BootstrapChangeKind::Created,
+            ".husky/post-checkout"
+        ));
+        assert!(has_change(
+            &changes,
             BootstrapChangeKind::Updated,
             ".gitignore"
         ));
         assert!(root.join(".husky/commit-msg").exists());
+        assert!(root.join(".husky/post-checkout").exists());
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("Before broad exploration, read `.agents/intel/summary.md`"));
         assert!(agents.contains("repo.json`, `database.md`, `imports.md`, and `calls.md`"));
@@ -504,6 +527,8 @@ mod tests {
         assert!(agent_check.contains("Skipping agent-check in CI pre-commit"));
         let pre_commit = fs::read_to_string(root.join(".husky/pre-commit")).unwrap();
         assert!(!pre_commit.contains("Skipping agent-check in CI pre-commit"));
+        let post_checkout = fs::read_to_string(root.join(".husky/post-checkout")).unwrap();
+        assert!(post_checkout.contains("bun install"));
     }
 
     #[test]
@@ -619,6 +644,35 @@ mod tests {
             &second_changes,
             BootstrapChangeKind::Updated,
             ".husky/pre-commit"
+        ));
+    }
+
+    #[test]
+    fn bootstrap_repo_integrates_existing_post_checkout_hook_without_overwriting() {
+        let root = temp_dir();
+        fs::create_dir_all(root.join(".husky")).unwrap();
+        fs::write(
+            root.join(".husky/post-checkout"),
+            "#!/bin/sh\nset -eu\n\necho checked out\n",
+        )
+        .unwrap();
+
+        let first_changes = bootstrap_repo(&root).unwrap();
+        let second_changes = bootstrap_repo(&root).unwrap();
+
+        let hook = fs::read_to_string(root.join(".husky/post-checkout")).unwrap();
+        assert!(hook.contains("echo checked out"));
+        assert_eq!(hook.matches("bun install").count(), 1);
+        assert_eq!(hook.matches("# agent-toolkit:start").count(), 1);
+        assert!(has_change(
+            &first_changes,
+            BootstrapChangeKind::Updated,
+            ".husky/post-checkout"
+        ));
+        assert!(!has_change(
+            &second_changes,
+            BootstrapChangeKind::Updated,
+            ".husky/post-checkout"
         ));
     }
 
