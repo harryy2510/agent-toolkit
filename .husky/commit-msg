@@ -3,7 +3,7 @@ set -eu
 
 first_line=$(sed -n '1p' "$1")
 
-if printf '%s\n' "$first_line" | grep -Eq '^[a-z0-9-]+(\([a-z0-9._/-]+\))?!?: .+'; then
+if printf '%s\n' "$first_line" | grep -Eq '^[a-z0-9-]+(\([a-z0-9._/-]+(,[a-z0-9._/-]+)*\))?!?: .+'; then
 	exit 0
 fi
 

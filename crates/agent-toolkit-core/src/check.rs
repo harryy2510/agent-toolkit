@@ -202,7 +202,7 @@ pub fn is_conventional_commit(message: &str) -> bool {
     }
 
     if let Some(scope) = scope {
-        if scope.is_empty() || !is_scope(scope) {
+        if scope.is_empty() || !is_scope_list(scope) {
             return false;
         }
     }
@@ -489,6 +489,12 @@ fn is_scope(value: &str) -> bool {
     })
 }
 
+fn is_scope_list(value: &str) -> bool {
+    value
+        .split(',')
+        .all(|scope| !scope.is_empty() && is_scope(scope))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -511,6 +517,9 @@ mod tests {
     fn conventional_commit_accepts_common_valid_messages() {
         assert!(is_conventional_commit("feat: add repo intelligence"));
         assert!(is_conventional_commit("fix(cli): preserve user files"));
+        assert!(is_conventional_commit(
+            "feat(widget,ci): enhance sign-out handling"
+        ));
         assert!(is_conventional_commit("chore!: drop legacy setup"));
     }
 
@@ -518,6 +527,8 @@ mod tests {
     fn conventional_commit_rejects_freeform_messages() {
         assert!(!is_conventional_commit("updated stuff"));
         assert!(!is_conventional_commit("Fix thing"));
+        assert!(!is_conventional_commit("feat(widget,): missing scope"));
+        assert!(!is_conventional_commit("feat(,ci): missing scope"));
         assert!(!is_conventional_commit(""));
     }
 
