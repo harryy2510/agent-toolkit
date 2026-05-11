@@ -234,14 +234,14 @@ The check command enforces:
 
 - `AGENTS.md` and `.agents/agents.json` exist.
 - `AGENTS.md` points agents to `.agents/intel/summary.md` before broad exploration.
-- `scripts/agent-check` and Husky hooks in `.husky/` exist for local and CI enforcement.
+- `scripts/agent-check` and committed repo hooks exist for local and CI enforcement. Vite+ repos use `.vite-hooks/`; other repos default to Husky `.husky/`.
 - New JavaScript-platform source uses TypeScript, not `.js` or `.jsx`.
 - `oxlint --type-aware --type-check` replaces `tsc` checks.
 - `oxlint` replaces ESLint.
 - `oxfmt` replaces Prettier.
 - Deslop-style checks catch debug statements, placeholders, empty catches, and likely hardcoded secrets.
 - Local/private agent state such as `.agents/local.json` and `.agents/generated/` is blocked when tracked by git; migrated repo intel and tool adapters such as `.agents/intel/`, `CLAUDE.md`, `.codex/`, `.gemini/`, and `.cursor/` are allowed to be committed.
-- Bootstrapped Husky hooks enforce Conventional Commit messages.
+- Bootstrapped repo hooks enforce Conventional Commit messages.
 - In Supabase projects, `repo check --staged` runs database lint for staged Supabase SQL/config changes, preferring a project script such as `db:lint` or `lint:db` before falling back to `supabase db lint --local --schema public --level warning --fail-on warning`. Add a project script when a repo needs to lint extra app schemas.
 
 Use the migration commands to make this standard repeatable:
@@ -444,7 +444,7 @@ bunx @harryy/agent-toolkit repo setup
 
 This commits the DotAgent instruction block in `AGENTS.md`, copies DotAgent skills into `.agents/skills/`, keeps role-profile and command references under `.agents/dotagent/`, and records the snapshot in `.agents/dotagent.lock.json`. Re-running the command is a no-op while the locked DotAgent version and revision match the source. Use `repo dotagent` only when you want to refresh just the DotAgent snapshot. Generated tool files stay local and are ignored by git unless the repo intentionally uses commit-generated sync output.
 
-For repos bootstrapped by Agent Toolkit, `scripts/agent-check` runs `agent-toolkit repo check`. Set `AGENT_TOOLKIT_SYNC_CHECK=1` when you also want hooks or CI to run `agents sync --path . --check`. Husky hooks call the same wrapper, so contributors do not need a global Agent Toolkit install.
+For repos bootstrapped by Agent Toolkit, `scripts/agent-check` runs `agent-toolkit repo check`. Set `AGENT_TOOLKIT_SYNC_CHECK=1` when you also want hooks or CI to run `agents sync --path . --check`. Repo hooks call the same wrapper, so contributors do not need a global Agent Toolkit install.
 
 Gemini CLI native extension wrappers live in plugin packages as `gemini-extension/` where needed.
 

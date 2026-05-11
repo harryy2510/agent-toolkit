@@ -14,6 +14,84 @@ pub(crate) const DEFAULT_INTEGRATIONS: [&str; 9] = [
     "junie",
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HookLayout {
+    pub source_dir: &'static str,
+    pub label: &'static str,
+}
+
+pub(crate) fn detect_hook_layout(root: &Path) -> HookLayout {
+    if let Some(configured_path) = configured_hooks_path(root) {
+        if configured_path.starts_with(".vite-hooks") {
+            return vite_plus_hook_layout();
+        }
+        if configured_path.starts_with(".husky") {
+            return husky_hook_layout();
+        }
+    }
+
+    if root.join(".vite-hooks").exists() || uses_vite_plus(root) {
+        return vite_plus_hook_layout();
+    }
+
+    husky_hook_layout()
+}
+
+pub(crate) fn hook_source_path(layout: HookLayout, hook_name: &str) -> String {
+    format!("{}/{}", layout.source_dir, hook_name)
+}
+
+pub(crate) fn hook_runtime_path(root: &Path, layout: HookLayout) -> String {
+    if layout.source_dir == ".vite-hooks" && root.join(".vite-hooks/_").exists() {
+        return ".vite-hooks/_".to_string();
+    }
+
+    layout.source_dir.to_string()
+}
+
+fn husky_hook_layout() -> HookLayout {
+    HookLayout {
+        source_dir: ".husky",
+        label: "Husky",
+    }
+}
+
+fn vite_plus_hook_layout() -> HookLayout {
+    HookLayout {
+        source_dir: ".vite-hooks",
+        label: "Vite+",
+    }
+}
+
+fn configured_hooks_path(root: &Path) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(["config", "--local", "--get", "core.hooksPath"])
+        .current_dir(root)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let hooks_path = String::from_utf8(output.stdout).ok()?;
+    let hooks_path = hooks_path.trim();
+    if hooks_path.is_empty() {
+        return None;
+    }
+
+    Some(hooks_path.to_string())
+}
+
+fn uses_vite_plus(root: &Path) -> bool {
+    fs::read_to_string(root.join("package.json")).is_ok_and(|contents| {
+        contents.contains("\"vite-plus\"")
+            || contents.contains("@voidzero-dev/vite-plus")
+            || contents.contains("vp config")
+            || contents.contains("vp staged")
+    }) || fs::read_to_string(root.join("vite.config.ts"))
+        .is_ok_and(|contents| contents.contains("vite-plus"))
+}
+
 const REPO_INTEL_AGENTS_BLOCK: &str = concat!(
     "<!-- AGENT-TOOLKIT:REPO-INTEL:START -->\n",
     "## Agent Toolkit Repo Intelligence\n\n",
@@ -61,6 +139,7 @@ impl BootstrapChange {
 
 pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     let mut changes = Vec::new();
+    let hook_layout = detect_hook_layout(root);
     create_file_if_missing(root, "AGENTS.md", agents_md(), &mut changes)?;
     ensure_repo_intel_instructions(root, &mut changes)?;
     ensure_agents_json(root, &mut changes)?;
@@ -73,7 +152,7 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     )?;
     ensure_hook(
         root,
-        ".husky/pre-commit",
+        &hook_source_path(hook_layout, "pre-commit"),
         pre_commit_hook(),
         "scripts/agent-check --staged",
         pre_commit_agent_check_block(),
@@ -81,7 +160,7 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     )?;
     ensure_hook(
         root,
-        ".husky/pre-push",
+        &hook_source_path(hook_layout, "pre-push"),
         pre_push_hook(),
         "scripts/agent-check",
         pre_push_agent_check_block(),
@@ -89,7 +168,7 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     )?;
     ensure_hook(
         root,
-        ".husky/commit-msg",
+        &hook_source_path(hook_layout, "commit-msg"),
         commit_msg_hook(),
         "Conventional Commit",
         commit_msg_agent_check_block(),
@@ -97,7 +176,7 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     )?;
     ensure_hook(
         root,
-        ".husky/post-checkout",
+        &hook_source_path(hook_layout, "post-checkout"),
         post_checkout_hook(),
         "bun install",
         post_checkout_agent_check_block(),
@@ -105,11 +184,23 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     )?;
     ensure_gitignore_entries(root, &mut changes)?;
     make_executable(root.join("scripts/agent-check").as_path())?;
-    make_executable(root.join(".husky/pre-commit").as_path())?;
-    make_executable(root.join(".husky/pre-push").as_path())?;
-    make_executable(root.join(".husky/commit-msg").as_path())?;
-    make_executable(root.join(".husky/post-checkout").as_path())?;
-    configure_git_hooks_path(root);
+    make_executable(
+        root.join(hook_source_path(hook_layout, "pre-commit"))
+            .as_path(),
+    )?;
+    make_executable(
+        root.join(hook_source_path(hook_layout, "pre-push"))
+            .as_path(),
+    )?;
+    make_executable(
+        root.join(hook_source_path(hook_layout, "commit-msg"))
+            .as_path(),
+    )?;
+    make_executable(
+        root.join(hook_source_path(hook_layout, "post-checkout"))
+            .as_path(),
+    )?;
+    configure_git_hooks_path(root, hook_layout);
     Ok(changes)
 }
 
@@ -415,12 +506,13 @@ fn make_executable(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn configure_git_hooks_path(root: &Path) {
+fn configure_git_hooks_path(root: &Path, hook_layout: HookLayout) {
     if !root.join(".git").exists() {
         return;
     }
+    let hooks_path = hook_runtime_path(root, hook_layout);
     let _ = std::process::Command::new("git")
-        .args(["config", "core.hooksPath", ".husky"])
+        .args(["config", "core.hooksPath", hooks_path.as_str()])
         .current_dir(root)
         .status();
 }
@@ -429,15 +521,16 @@ fn configure_git_hooks_path(root: &Path) {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
     fn temp_dir() -> std::path::PathBuf {
         let mut path = std::env::temp_dir();
         path.push(format!(
-            "agent-toolkit-hooks-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            "agent-toolkit-hooks-{}-{}",
+            std::process::id(),
+            TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&path).unwrap();
         path
@@ -530,6 +623,42 @@ mod tests {
         assert!(!pre_commit.contains("Skipping agent-check in CI pre-commit"));
         let post_checkout = fs::read_to_string(root.join(".husky/post-checkout")).unwrap();
         assert!(post_checkout.contains("bun install"));
+    }
+
+    #[test]
+    fn bootstrap_repo_uses_vite_plus_hooks_when_project_uses_vite_plus() {
+        let root = temp_dir();
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let changes = bootstrap_repo(&root).unwrap();
+
+        assert!(has_change(
+            &changes,
+            BootstrapChangeKind::Created,
+            ".vite-hooks/pre-commit"
+        ));
+        assert!(has_change(
+            &changes,
+            BootstrapChangeKind::Created,
+            ".vite-hooks/pre-push"
+        ));
+        assert!(has_change(
+            &changes,
+            BootstrapChangeKind::Created,
+            ".vite-hooks/commit-msg"
+        ));
+        assert!(has_change(
+            &changes,
+            BootstrapChangeKind::Created,
+            ".vite-hooks/post-checkout"
+        ));
+        assert!(!root.join(".husky/pre-commit").exists());
+        assert!(root.join(".vite-hooks/commit-msg").exists());
+        assert!(root.join(".vite-hooks/post-checkout").exists());
     }
 
     #[test]

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use crate::hooks::DEFAULT_INTEGRATIONS;
+use crate::hooks::{detect_hook_layout, hook_source_path, HookLayout, DEFAULT_INTEGRATIONS};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum IssueCode {
@@ -65,33 +65,38 @@ pub fn check_repo(root: &Path) -> Vec<RepoIssue> {
 		IssueCode::MissingAgentCheckScript,
 		"scripts/agent-check is required so hooks and CI can run repo-local checks without global installs",
 	);
+    let hook_layout = detect_hook_layout(root);
     push_missing_hook_issue(
         &mut issues,
         root,
-        ".husky/pre-commit",
+        hook_layout,
+        "pre-commit",
         "scripts/agent-check --staged",
-        "repo Husky pre-commit hook must run scripts/agent-check --staged",
+        "pre-commit hook must run scripts/agent-check --staged",
     );
     push_missing_hook_issue(
         &mut issues,
         root,
-        ".husky/pre-push",
+        hook_layout,
+        "pre-push",
         "scripts/agent-check",
-        "repo Husky pre-push hook must run scripts/agent-check",
+        "pre-push hook must run scripts/agent-check",
     );
     push_missing_hook_issue(
         &mut issues,
         root,
-        ".husky/commit-msg",
+        hook_layout,
+        "commit-msg",
         "Conventional Commit",
-        "repo Husky commit-msg hook must enforce Conventional Commit messages",
+        "commit-msg hook must enforce Conventional Commit messages",
     );
     push_missing_hook_issue(
         &mut issues,
         root,
-        ".husky/post-checkout",
+        hook_layout,
+        "post-checkout",
         "bun install",
-        "repo Husky post-checkout hook must run bun install",
+        "post-checkout hook must run bun install",
     );
 
     push_disallowed_tracked_file_issues(root, &mut issues);
@@ -228,15 +233,20 @@ fn push_missing_file_issue(
 fn push_missing_hook_issue(
     issues: &mut Vec<RepoIssue>,
     root: &Path,
-    relative_path: &str,
+    layout: HookLayout,
+    hook_name: &str,
     required_needle: &str,
     message: &str,
 ) {
-    let path = root.join(relative_path);
+    let relative_path = hook_source_path(layout, hook_name);
+    let path = root.join(&relative_path);
     let Ok(contents) = fs::read_to_string(&path) else {
         issues.push(RepoIssue {
             code: IssueCode::MissingGitHook,
-            message: format!("{relative_path}: repo Husky hooks must be committed"),
+            message: format!(
+                "{relative_path}: repo {} hooks must be committed",
+                layout.label
+            ),
         });
         return;
     };
@@ -244,7 +254,7 @@ fn push_missing_hook_issue(
     if !contents.contains(required_needle) {
         issues.push(RepoIssue {
             code: IssueCode::MissingGitHook,
-            message: format!("{relative_path}: {message}"),
+            message: format!("{relative_path}: repo {} {message}", layout.label),
         });
     }
 }
@@ -499,15 +509,16 @@ fn is_scope_list(value: &str) -> bool {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
     fn temp_dir() -> std::path::PathBuf {
         let mut path = std::env::temp_dir();
         path.push(format!(
-            "agent-toolkit-check-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            "agent-toolkit-check-{}-{}",
+            std::process::id(),
+            TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&path).unwrap();
         path
@@ -596,6 +607,41 @@ mod tests {
         assert!(issues.iter().any(|issue| {
             issue.code == IssueCode::MissingGitHook
                 && issue.message.contains("scripts/agent-check --staged")
+        }));
+    }
+
+    #[test]
+    fn check_repo_accepts_vite_plus_hooks() {
+        let root = temp_dir();
+        write_minimal_repo_files_with_hooks(&root, ".vite-hooks");
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let issues = check_repo(&root);
+
+        assert!(!issues
+            .iter()
+            .any(|issue| issue.code == IssueCode::MissingGitHook));
+    }
+
+    #[test]
+    fn check_repo_reports_missing_vite_plus_hook_paths_for_vite_plus_projects() {
+        let root = temp_dir();
+        write_minimal_repo_files(&root);
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let issues = check_repo(&root);
+
+        assert!(issues.iter().any(|issue| {
+            issue.code == IssueCode::MissingGitHook
+                && issue.message.contains(".vite-hooks/pre-commit")
         }));
     }
 
@@ -887,8 +933,12 @@ mod tests {
     }
 
     fn write_minimal_repo_files(root: &Path) {
+        write_minimal_repo_files_with_hooks(root, ".husky");
+    }
+
+    fn write_minimal_repo_files_with_hooks(root: &Path, hook_dir: &str) {
         fs::create_dir_all(root.join(".agents")).unwrap();
-        fs::create_dir_all(root.join(".husky")).unwrap();
+        fs::create_dir_all(root.join(hook_dir)).unwrap();
         fs::create_dir_all(root.join("scripts")).unwrap();
         fs::write(
             root.join("AGENTS.md"),
@@ -898,22 +948,22 @@ mod tests {
         fs::write(root.join(".agents/agents.json"), minimal_agents_json()).unwrap();
         fs::write(root.join("scripts/agent-check"), "#!/bin/sh\n").unwrap();
         fs::write(
-            root.join(".husky/pre-commit"),
+            root.join(hook_dir).join("pre-commit"),
             "#!/bin/sh\nscripts/agent-check --staged\n",
         )
         .unwrap();
         fs::write(
-            root.join(".husky/pre-push"),
+            root.join(hook_dir).join("pre-push"),
             "#!/bin/sh\nscripts/agent-check\n",
         )
         .unwrap();
         fs::write(
-            root.join(".husky/commit-msg"),
+            root.join(hook_dir).join("commit-msg"),
             "#!/bin/sh\necho \"Conventional Commit\"\n",
         )
         .unwrap();
         fs::write(
-            root.join(".husky/post-checkout"),
+            root.join(hook_dir).join("post-checkout"),
             "#!/bin/sh\nbun install\n",
         )
         .unwrap();
