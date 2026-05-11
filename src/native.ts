@@ -64,8 +64,18 @@ export function resolveNativeCommand(
 
 	if (isSourceCheckout(options.packageRoot)) {
 		return {
-			command: ['cargo', 'run', '-p', 'agent-toolkit', '--quiet', '--', ...args],
-			cwd: options.packageRoot,
+			command: [
+				'cargo',
+				'run',
+				'--manifest-path',
+				join(options.packageRoot, 'Cargo.toml'),
+				'-p',
+				'agent-toolkit',
+				'--quiet',
+				'--',
+				...args,
+			],
+			cwd: callerCwd,
 			error: null,
 		}
 	}

@@ -628,6 +628,33 @@ mod tests {
     }
 
     #[test]
+    fn check_repo_accepts_vite_plus_hooks_when_git_config_has_stale_husky_path() {
+        let root = temp_dir();
+        Command::new("git")
+            .arg("init")
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "core.hooksPath", ".husky"])
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        write_minimal_repo_files_with_hooks(&root, ".vite-hooks");
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let issues = check_repo(&root);
+
+        assert!(!issues
+            .iter()
+            .any(|issue| issue.code == IssueCode::MissingGitHook));
+    }
+
+    #[test]
     fn check_repo_reports_missing_vite_plus_hook_paths_for_vite_plus_projects() {
         let root = temp_dir();
         write_minimal_repo_files(&root);

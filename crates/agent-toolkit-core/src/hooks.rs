@@ -21,6 +21,10 @@ pub(crate) struct HookLayout {
 }
 
 pub(crate) fn detect_hook_layout(root: &Path) -> HookLayout {
+    if root.join(".vite-hooks").exists() || uses_vite_plus(root) {
+        return vite_plus_hook_layout();
+    }
+
     if let Some(configured_path) = configured_hooks_path(root) {
         if configured_path.starts_with(".vite-hooks") {
             return vite_plus_hook_layout();
@@ -28,10 +32,6 @@ pub(crate) fn detect_hook_layout(root: &Path) -> HookLayout {
         if configured_path.starts_with(".husky") {
             return husky_hook_layout();
         }
-    }
-
-    if root.join(".vite-hooks").exists() || uses_vite_plus(root) {
-        return vite_plus_hook_layout();
     }
 
     husky_hook_layout()
@@ -521,6 +521,7 @@ fn configure_git_hooks_path(root: &Path, hook_layout: HookLayout) {
 mod tests {
     use super::*;
     use std::fs;
+    use std::process::Command;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -659,6 +660,45 @@ mod tests {
         assert!(!root.join(".husky/pre-commit").exists());
         assert!(root.join(".vite-hooks/commit-msg").exists());
         assert!(root.join(".vite-hooks/post-checkout").exists());
+    }
+
+    #[test]
+    fn bootstrap_repo_uses_vite_plus_hooks_when_git_config_has_stale_husky_path() {
+        let root = temp_dir();
+        Command::new("git")
+            .arg("init")
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        Command::new("git")
+            .args(["config", "core.hooksPath", ".husky"])
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        fs::create_dir_all(root.join(".vite-hooks/_")).unwrap();
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let changes = bootstrap_repo(&root).unwrap();
+        let hooks_path = Command::new("git")
+            .args(["config", "--local", "--get", "core.hooksPath"])
+            .current_dir(&root)
+            .output()
+            .unwrap();
+
+        assert!(has_change(
+            &changes,
+            BootstrapChangeKind::Created,
+            ".vite-hooks/pre-commit"
+        ));
+        assert!(!root.join(".husky/pre-commit").exists());
+        assert_eq!(
+            String::from_utf8(hooks_path.stdout).unwrap().trim(),
+            ".vite-hooks/_"
+        );
     }
 
     #[test]

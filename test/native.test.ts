@@ -67,17 +67,21 @@ describe('native binary resolution', () => {
 
 	test('allows Cargo fallback only inside a source checkout', () => {
 		const root = mkdtempSync(join(tmpdir(), 'agent-toolkit-source-'))
+		const callerCwd = mkdtempSync(join(tmpdir(), 'agent-toolkit-caller-cwd-'))
 		mkdirSync(join(root, '.git'), { recursive: true })
 		writeFileSync(join(root, 'Cargo.toml'), '[workspace]\n')
 
 		const command = resolveNativeCommand(['repo', 'check'], {
 			packageRoot: root,
+			cwd: callerCwd,
 			env: {},
 		})
 
 		expect(command.command).toEqual([
 			'cargo',
 			'run',
+			'--manifest-path',
+			join(root, 'Cargo.toml'),
 			'-p',
 			'agent-toolkit',
 			'--quiet',
@@ -85,12 +89,13 @@ describe('native binary resolution', () => {
 			'repo',
 			'check',
 		])
-		expect(command.cwd).toBe(root)
+		expect(command.cwd).toBe(callerCwd)
 		expect(command.error).toBeNull()
 	})
 
 	test('uses Cargo in source checkouts even when stale target binaries exist', () => {
 		const root = mkdtempSync(join(tmpdir(), 'agent-toolkit-source-stale-'))
+		const callerCwd = mkdtempSync(join(tmpdir(), 'agent-toolkit-caller-cwd-'))
 		mkdirSync(join(root, '.git'), { recursive: true })
 		mkdirSync(join(root, 'target', 'release'), { recursive: true })
 		writeFileSync(join(root, 'Cargo.toml'), '[workspace]\n')
@@ -98,18 +103,21 @@ describe('native binary resolution', () => {
 
 		const command = resolveNativeCommand(['repo', 'check'], {
 			packageRoot: root,
+			cwd: callerCwd,
 			env: {},
 		})
 
-		expect(command.command?.slice(0, 6)).toEqual([
+		expect(command.command?.slice(0, 8)).toEqual([
 			'cargo',
 			'run',
+			'--manifest-path',
+			join(root, 'Cargo.toml'),
 			'-p',
 			'agent-toolkit',
 			'--quiet',
 			'--',
 		])
-		expect(command.cwd).toBe(root)
+		expect(command.cwd).toBe(callerCwd)
 		expect(command.error).toBeNull()
 	})
 })
