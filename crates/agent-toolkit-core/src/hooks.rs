@@ -21,17 +21,39 @@ pub(crate) struct HookLayout {
 }
 
 pub(crate) fn detect_hook_layout(root: &Path) -> HookLayout {
-    if root.join(".vite-hooks").exists() || uses_vite_plus(root) {
+    let has_vite_hooks = root.join(".vite-hooks").exists();
+    let has_husky_hooks = root.join(".husky").exists();
+    let configured_path = configured_hooks_path(root);
+
+    if has_vite_hooks && has_husky_hooks {
+        if configured_path
+            .as_deref()
+            .is_some_and(|path| path.starts_with(".husky"))
+        {
+            return husky_hook_layout();
+        }
         return vite_plus_hook_layout();
     }
 
-    if let Some(configured_path) = configured_hooks_path(root) {
+    if has_vite_hooks {
+        return vite_plus_hook_layout();
+    }
+
+    if has_husky_hooks {
+        return husky_hook_layout();
+    }
+
+    if let Some(configured_path) = configured_path {
         if configured_path.starts_with(".vite-hooks") {
             return vite_plus_hook_layout();
         }
         if configured_path.starts_with(".husky") {
             return husky_hook_layout();
         }
+    }
+
+    if uses_vite_plus(root) {
+        return vite_plus_hook_layout();
     }
 
     husky_hook_layout()
@@ -660,6 +682,28 @@ mod tests {
         assert!(!root.join(".husky/pre-commit").exists());
         assert!(root.join(".vite-hooks/commit-msg").exists());
         assert!(root.join(".vite-hooks/post-checkout").exists());
+    }
+
+    #[test]
+    fn bootstrap_repo_respects_existing_husky_hooks_for_vite_plus_project() {
+        let root = temp_dir();
+        fs::create_dir_all(root.join(".husky")).unwrap();
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let changes = bootstrap_repo(&root).unwrap();
+
+        assert!(has_change(
+            &changes,
+            BootstrapChangeKind::Created,
+            ".husky/pre-commit"
+        ));
+        assert!(root.join(".husky/commit-msg").exists());
+        assert!(root.join(".husky/post-checkout").exists());
+        assert!(!root.join(".vite-hooks/pre-commit").exists());
     }
 
     #[test]

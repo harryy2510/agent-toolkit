@@ -628,6 +628,23 @@ mod tests {
     }
 
     #[test]
+    fn check_repo_accepts_existing_husky_hooks_for_vite_plus_project() {
+        let root = temp_dir();
+        write_minimal_repo_files_with_hooks(&root, ".husky");
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let issues = check_repo(&root);
+
+        assert!(!issues
+            .iter()
+            .any(|issue| issue.code == IssueCode::MissingGitHook));
+    }
+
+    #[test]
     fn check_repo_accepts_vite_plus_hooks_when_git_config_has_stale_husky_path() {
         let root = temp_dir();
         Command::new("git")
@@ -657,7 +674,7 @@ mod tests {
     #[test]
     fn check_repo_reports_missing_vite_plus_hook_paths_for_vite_plus_projects() {
         let root = temp_dir();
-        write_minimal_repo_files(&root);
+        write_minimal_repo_files_without_hooks(&root);
         fs::write(
             root.join("package.json"),
             r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
@@ -963,9 +980,8 @@ mod tests {
         write_minimal_repo_files_with_hooks(root, ".husky");
     }
 
-    fn write_minimal_repo_files_with_hooks(root: &Path, hook_dir: &str) {
+    fn write_minimal_repo_files_without_hooks(root: &Path) {
         fs::create_dir_all(root.join(".agents")).unwrap();
-        fs::create_dir_all(root.join(hook_dir)).unwrap();
         fs::create_dir_all(root.join("scripts")).unwrap();
         fs::write(
             root.join("AGENTS.md"),
@@ -974,6 +990,11 @@ mod tests {
         .unwrap();
         fs::write(root.join(".agents/agents.json"), minimal_agents_json()).unwrap();
         fs::write(root.join("scripts/agent-check"), "#!/bin/sh\n").unwrap();
+    }
+
+    fn write_minimal_repo_files_with_hooks(root: &Path, hook_dir: &str) {
+        write_minimal_repo_files_without_hooks(root);
+        fs::create_dir_all(root.join(hook_dir)).unwrap();
         fs::write(
             root.join(hook_dir).join("pre-commit"),
             "#!/bin/sh\nscripts/agent-check --staged\n",
