@@ -443,7 +443,7 @@ Team repos can also carry DotAgent as a pinned project dependency:
 bunx @harryy/agent-toolkit repo setup
 ```
 
-This commits the DotAgent instruction block in `AGENTS.md`, copies DotAgent skills into `.agents/skills/`, keeps role-profile and command references under `.agents/dotagent/`, and records the snapshot in `.agents/dotagent.lock.json`. Re-running the command is a no-op while the locked DotAgent version and revision match the source. Use `repo dotagent` only when you want to refresh just the DotAgent snapshot. Generated tool files stay local and are ignored by git unless the repo intentionally uses commit-generated sync output.
+This updates the default DotAgent source cache, commits the DotAgent instruction block in `AGENTS.md`, copies DotAgent skills into `.agents/skills/`, keeps role-profile and command references under `.agents/dotagent/`, and records the snapshot in `.agents/dotagent.lock.json`. Re-running the command is a no-op while the locked DotAgent version and revision match the refreshed source. Use `repo dotagent` only when you want to refresh just the DotAgent snapshot. Generated tool files stay local and are ignored by git unless the repo intentionally uses commit-generated sync output.
 
 For repos bootstrapped by Agent Toolkit, `scripts/agent-check` runs `agent-toolkit repo check`. Set `AGENT_TOOLKIT_SYNC_CHECK=1` when you also want hooks or CI to run `agents sync --path . --check`. Repo hooks call the same wrapper, so contributors do not need a global Agent Toolkit install.
 

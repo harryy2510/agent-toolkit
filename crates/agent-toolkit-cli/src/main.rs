@@ -103,13 +103,14 @@ fn run() -> Result<(), String> {
             let dotagent_repo = options
                 .dotagent_source
                 .unwrap_or_else(|| home.join(".agent-toolkit/plugins/dotagent"));
-            if !dotagent_repo.join("plugins/dotagent/AGENTS.md").exists() {
-                if explicit_dotagent_source {
+            if explicit_dotagent_source {
+                if !dotagent_repo.join("plugins/dotagent/AGENTS.md").exists() {
                     return Err(format!(
                         "DotAgent source was not found at {}",
                         dotagent_repo.display()
                     ));
                 }
+            } else {
                 ensure_dotagent_repo(&dotagent_repo)?;
             }
             let result = install_repo_dotagent_with_options(
@@ -475,13 +476,14 @@ fn run_repo_setup(command: &str, args: &[String]) -> Result<(), String> {
     let dotagent_repo = options
         .dotagent_source
         .unwrap_or_else(|| home.join(".agent-toolkit/plugins/dotagent"));
-    if !dotagent_repo.join("plugins/dotagent/AGENTS.md").exists() {
-        if explicit_dotagent_source {
+    if explicit_dotagent_source {
+        if !dotagent_repo.join("plugins/dotagent/AGENTS.md").exists() {
             return Err(format!(
                 "DotAgent source was not found at {}",
                 dotagent_repo.display()
             ));
         }
+    } else {
         ensure_dotagent_repo(&dotagent_repo)?;
     }
 
