@@ -123,6 +123,8 @@ const REPO_INTEL_AGENTS_BLOCK: &str = concat!(
     "- `.agents/intel/` is generated repo intelligence and may be committed in migrated repos.\n",
     "<!-- AGENT-TOOLKIT:REPO-INTEL:END -->\n",
 );
+const HOOK_MANAGER_BLOCK_START: &str = "<!-- AGENT-TOOLKIT:HOOK-MANAGER:START -->";
+const HOOK_MANAGER_BLOCK_END: &str = "<!-- AGENT-TOOLKIT:HOOK-MANAGER:END -->";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BootstrapChangeKind {
@@ -164,6 +166,7 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     let hook_layout = detect_hook_layout(root);
     create_file_if_missing(root, "AGENTS.md", agents_md(), &mut changes)?;
     ensure_repo_intel_instructions(root, &mut changes)?;
+    ensure_hook_manager_instructions(root, hook_layout, &mut changes)?;
     ensure_agents_json(root, &mut changes)?;
     create_file_if_missing(root, ".agents/README.md", agents_readme(), &mut changes)?;
     create_file_if_missing(
@@ -432,8 +435,39 @@ fn ensure_repo_intel_instructions(
     )
 }
 
+fn ensure_hook_manager_instructions(
+    root: &Path,
+    layout: HookLayout,
+    changes: &mut Vec<BootstrapChange>,
+) -> std::io::Result<()> {
+    ensure_managed_block(
+        root,
+        "AGENTS.md",
+        HOOK_MANAGER_BLOCK_START,
+        HOOK_MANAGER_BLOCK_END,
+        &hook_manager_agents_block(root, layout),
+        changes,
+    )
+}
+
 fn repo_intel_agents_block() -> &'static str {
     REPO_INTEL_AGENTS_BLOCK
+}
+
+fn hook_manager_agents_block(root: &Path, layout: HookLayout) -> String {
+    let runtime_path = hook_runtime_path(root, layout);
+    let runtime_guidance = if layout.source_dir == ".vite-hooks" {
+        format!(
+            "- Keep Git `core.hooksPath` set to `{runtime_path}`; if `.vite-hooks/_` wrappers are missing, regenerate them with `vp config`.\n"
+        )
+    } else {
+        format!("- Keep Git `core.hooksPath` set to `{runtime_path}`.\n")
+    };
+
+    format!(
+        "{HOOK_MANAGER_BLOCK_START}\n## Agent Toolkit Hook Manager\n\n- This repo uses {} hooks. Keep `{}/` as the active committed hook source.\n{}- This repo-specific hook manager rule overrides generic DotAgent hook guidance.\n- Do not introduce `.githooks` or another ad hoc hook folder.\n{HOOK_MANAGER_BLOCK_END}\n",
+        layout.label, layout.source_dir, runtime_guidance
+    )
 }
 
 fn ensure_managed_block(
@@ -613,17 +647,20 @@ mod tests {
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("Before broad exploration, read `.agents/intel/summary.md`"));
         assert!(agents.contains("repo.json`, `database.md`, `imports.md`, and `calls.md`"));
+        assert!(agents.contains("This repo uses Husky hooks"));
+        assert!(agents.contains("overrides generic DotAgent hook guidance"));
         assert_eq!(
             agents
                 .matches("<!-- AGENT-TOOLKIT:REPO-INTEL:START -->")
                 .count(),
             1
         );
-        assert!(!has_change(
-            &changes,
-            BootstrapChangeKind::Updated,
-            "AGENTS.md"
-        ));
+        assert_eq!(
+            agents
+                .matches("<!-- AGENT-TOOLKIT:HOOK-MANAGER:START -->")
+                .count(),
+            1
+        );
         let agents_readme = fs::read_to_string(root.join(".agents/README.md")).unwrap();
         assert!(agents_readme.contains("Agents should start at `intel/summary.md`"));
         assert!(agents_readme.contains("deep-read only"));
@@ -682,6 +719,10 @@ mod tests {
         assert!(!root.join(".husky/pre-commit").exists());
         assert!(root.join(".vite-hooks/commit-msg").exists());
         assert!(root.join(".vite-hooks/post-checkout").exists());
+        let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
+        assert!(agents.contains("This repo uses Vite+ hooks"));
+        assert!(agents.contains("Keep `.vite-hooks/` as the active committed hook source"));
+        assert!(agents.contains("overrides generic DotAgent hook guidance"));
     }
 
     #[test]
@@ -704,6 +745,9 @@ mod tests {
         assert!(root.join(".husky/commit-msg").exists());
         assert!(root.join(".husky/post-checkout").exists());
         assert!(!root.join(".vite-hooks/pre-commit").exists());
+        let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
+        assert!(agents.contains("This repo uses Husky hooks"));
+        assert!(!agents.contains("This repo uses Vite+ hooks"));
     }
 
     #[test]
@@ -743,6 +787,9 @@ mod tests {
             String::from_utf8(hooks_path.stdout).unwrap().trim(),
             ".vite-hooks/_"
         );
+        let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
+        assert!(agents.contains("This repo uses Vite+ hooks"));
+        assert!(agents.contains("core.hooksPath` set to `.vite-hooks/_`"));
     }
 
     #[test]

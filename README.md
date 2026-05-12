@@ -235,6 +235,7 @@ The check command enforces:
 - `AGENTS.md` and `.agents/agents.json` exist.
 - `AGENTS.md` points agents to `.agents/intel/summary.md` before broad exploration.
 - `scripts/agent-check` and committed repo hooks exist for local and CI enforcement. Existing `.husky/` or `.vite-hooks/` layouts are respected; new Vite+ repos default to `.vite-hooks/`, and other repos default to Husky `.husky/`.
+- `AGENTS.md` records the active hook manager so Vite+ repo guidance overrides generic DotAgent Husky defaults.
 - New JavaScript-platform source uses TypeScript, not `.js` or `.jsx`.
 - `oxlint --type-aware --type-check` replaces `tsc` checks.
 - `oxlint` replaces ESLint.

@@ -12,6 +12,7 @@ pub enum IssueCode {
     MissingAgentsIntegration,
     MissingAgentCheckScript,
     MissingGitHook,
+    MissingHookManagerInstructions,
     DisallowedTrackedFile,
     JavaScriptSource,
     TscUsage,
@@ -32,7 +33,7 @@ pub fn check_repo(root: &Path) -> Vec<RepoIssue> {
     let mut issues = Vec::new();
 
     let agents_path = root.join("AGENTS.md");
-    match fs::read_to_string(&agents_path) {
+    let agents_contents = match fs::read_to_string(&agents_path) {
         Ok(contents) => {
             if !contents.contains(".agents/intel/summary.md") {
                 issues.push(RepoIssue {
@@ -40,14 +41,16 @@ pub fn check_repo(root: &Path) -> Vec<RepoIssue> {
                     message: "AGENTS.md must tell agents to read .agents/intel/summary.md before broad exploration".to_string(),
                 });
             }
+            Some(contents)
         }
         Err(_) => {
             issues.push(RepoIssue {
                 code: IssueCode::MissingAgentsMd,
                 message: "AGENTS.md is required as the canonical repo instruction file".to_string(),
             });
+            None
         }
-    }
+    };
 
     match fs::read_to_string(root.join(".agents/agents.json")) {
         Ok(contents) => push_agents_config_issues(&mut issues, &contents),
@@ -66,6 +69,9 @@ pub fn check_repo(root: &Path) -> Vec<RepoIssue> {
 		"scripts/agent-check is required so hooks and CI can run repo-local checks without global installs",
 	);
     let hook_layout = detect_hook_layout(root);
+    if let Some(contents) = agents_contents.as_deref() {
+        push_hook_manager_instruction_issue(&mut issues, hook_layout, contents);
+    }
     push_missing_hook_issue(
         &mut issues,
         root,
@@ -228,6 +234,29 @@ fn push_missing_file_issue(
             message: format!("{relative_path}: {message}"),
         });
     }
+}
+
+fn push_hook_manager_instruction_issue(
+    issues: &mut Vec<RepoIssue>,
+    layout: HookLayout,
+    agents_contents: &str,
+) {
+    if layout.source_dir != ".vite-hooks" {
+        return;
+    }
+    if !agents_contents.contains("Use Husky for git hooks") {
+        return;
+    }
+    if agents_contents.contains("This repo uses Vite+ hooks")
+        && agents_contents.contains("overrides generic DotAgent hook guidance")
+    {
+        return;
+    }
+
+    issues.push(RepoIssue {
+        code: IssueCode::MissingHookManagerInstructions,
+        message: "AGENTS.md must declare Vite+ .vite-hooks as the active hook manager when DotAgent's generic Husky guidance is present".to_string(),
+    });
 }
 
 fn push_missing_hook_issue(
@@ -625,6 +654,51 @@ mod tests {
         assert!(!issues
             .iter()
             .any(|issue| issue.code == IssueCode::MissingGitHook));
+    }
+
+    #[test]
+    fn check_repo_reports_vite_plus_missing_hook_manager_override_for_dotagent_husky_guidance() {
+        let root = temp_dir();
+        write_minimal_repo_files_with_hooks(&root, ".vite-hooks");
+        fs::write(
+            root.join("AGENTS.md"),
+            "# Rules\n\nRead `.agents/intel/summary.md` before broad exploration.\n\nUse Husky for git hooks.\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let issues = check_repo(&root);
+
+        assert!(issues.iter().any(|issue| {
+            issue.code == IssueCode::MissingHookManagerInstructions
+                && issue.message.contains("Vite+ .vite-hooks")
+        }));
+    }
+
+    #[test]
+    fn check_repo_accepts_vite_plus_hook_manager_override_for_dotagent_husky_guidance() {
+        let root = temp_dir();
+        write_minimal_repo_files_with_hooks(&root, ".vite-hooks");
+        fs::write(
+            root.join("AGENTS.md"),
+            "# Rules\n\nRead `.agents/intel/summary.md` before broad exploration.\n\nUse Husky for git hooks.\n\nThis repo uses Vite+ hooks and overrides generic DotAgent hook guidance.\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"prepare":"is-ci || vp config"},"devDependencies":{"vite-plus":"latest"}}"#,
+        )
+        .unwrap();
+
+        let issues = check_repo(&root);
+
+        assert!(!issues
+            .iter()
+            .any(|issue| issue.code == IssueCode::MissingHookManagerInstructions));
     }
 
     #[test]
