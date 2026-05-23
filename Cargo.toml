@@ -6,4 +6,4 @@ members = ["crates/agent-toolkit-core", "crates/agent-toolkit-cli"]
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/harryy2510/agent-toolkit"
-version = "0.1.32"
+version = "0.1.33"

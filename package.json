@@ -1,6 +1,6 @@
 {
 	"name": "@harryy/agent-toolkit",
-	"version": "0.1.32",
+	"version": "0.1.33",
 	"description": "Fast agent-agnostic setup, repo intelligence, and enforcement CLI.",
 	"license": "MIT",
 	"repository": {
