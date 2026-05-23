@@ -20,6 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  id-token: write # Required for OIDC
   contents: write
 
 concurrency:
@@ -126,6 +127,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: oven-sh/setup-bun@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false # never use caching in release builds
 
       - name: Apply release version
         run: |
