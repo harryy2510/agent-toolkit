@@ -169,12 +169,7 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     ensure_hook_manager_instructions(root, hook_layout, &mut changes)?;
     ensure_agents_json(root, &mut changes)?;
     create_file_if_missing(root, ".agents/README.md", agents_readme(), &mut changes)?;
-    create_file_if_missing(
-        root,
-        "scripts/agent-check",
-        agent_check_script(),
-        &mut changes,
-    )?;
+    ensure_agent_check_script(root, &mut changes)?;
     ensure_hook(
         root,
         &hook_source_path(hook_layout, "pre-commit"),
@@ -269,7 +264,36 @@ fn old_post_checkout_install_block() -> &'static str {
 }
 
 fn agent_check_script() -> &'static str {
-    "#!/bin/sh\nset -eu\n\nif [ \"${1:-}\" = \"--staged\" ] && { [ \"${CI:-}\" = \"true\" ] || [ \"${GITHUB_ACTIONS:-}\" = \"true\" ]; }; then\n\techo \"Skipping agent-check in CI pre-commit\"\n\texit 0\nfi\n\nif [ -z \"${AGENT_TOOLKIT_BIN:-}\" ] && ! command -v bunx >/dev/null 2>&1; then\n\techo \"agent-toolkit requires bunx. Install Bun, then rerun this command.\" >&2\n\texit 1\nfi\n\nif [ -n \"${AGENT_TOOLKIT_BIN:-}\" ]; then\n\t\"$AGENT_TOOLKIT_BIN\" repo check \"$@\"\nelse\n\tbunx @harryy/agent-toolkit repo check \"$@\"\nfi\n\nif [ \"${AGENT_TOOLKIT_SYNC_CHECK:-}\" = \"1\" ] && command -v agents >/dev/null 2>&1; then\n\tagents sync --path . --check\nfi\n"
+    concat!(
+        "#!/bin/sh\n",
+        "# agent-toolkit:managed-script\n",
+        "set -eu\n\n",
+        "if [ \"${1:-}\" = \"--staged\" ] && { [ \"${CI:-}\" = \"true\" ] || [ \"${GITHUB_ACTIONS:-}\" = \"true\" ]; }; then\n",
+        "\techo \"Skipping agent-check in CI pre-commit\"\n",
+        "\texit 0\n",
+        "fi\n\n",
+        "if [ -z \"${AGENT_TOOLKIT_BIN:-}\" ] && ! command -v bun >/dev/null 2>&1; then\n",
+        "\techo \"agent-toolkit requires Bun. Install Bun, then rerun this command.\" >&2\n",
+        "\texit 1\n",
+        "fi\n\n",
+        "if [ -n \"${AGENT_TOOLKIT_BIN:-}\" ]; then\n",
+        "\t\"$AGENT_TOOLKIT_BIN\" repo check \"$@\"\n",
+        "elif [ -f bin/agent-toolkit.ts ]; then\n",
+        "\tbun bin/agent-toolkit.ts repo check \"$@\"\n",
+        "else\n",
+        "\tbunx @harryy/agent-toolkit repo check \"$@\"\n",
+        "fi\n\n",
+        "if [ \"${AGENT_TOOLKIT_SYNC_CHECK:-}\" = \"1\" ] && command -v agents >/dev/null 2>&1; then\n",
+        "\tagents sync --path . --check\n",
+        "fi\n",
+    )
+}
+
+fn legacy_agent_check_scripts() -> [&'static str; 2] {
+    [
+        "#!/bin/sh\nset -eu\n\nif [ \"${1:-}\" = \"--staged\" ] && { [ \"${CI:-}\" = \"true\" ] || [ \"${GITHUB_ACTIONS:-}\" = \"true\" ]; }; then\n\techo \"Skipping agent-check in CI pre-commit\"\n\texit 0\nfi\n\nif [ -z \"${AGENT_TOOLKIT_BIN:-}\" ] && ! command -v bunx >/dev/null 2>&1; then\n\techo \"agent-toolkit requires bunx. Install Bun, then rerun this command.\" >&2\n\texit 1\nfi\n\nif [ -n \"${AGENT_TOOLKIT_BIN:-}\" ]; then\n\t\"$AGENT_TOOLKIT_BIN\" repo check \"$@\"\nelse\n\tbunx @harryy/agent-toolkit repo check \"$@\"\nfi\n\nif [ \"${AGENT_TOOLKIT_SYNC_CHECK:-}\" = \"1\" ] && command -v agents >/dev/null 2>&1; then\n\tagents sync --path . --check\nfi\n",
+        "#!/bin/sh\nset -eu\n\nif [ \"${1:-}\" = \"--staged\" ] && { [ \"${CI:-}\" = \"true\" ] || [ \"${GITHUB_ACTIONS:-}\" = \"true\" ]; }; then\n\techo \"Skipping agent-check in CI pre-commit\"\n\texit 0\nfi\n\nif ! command -v bun >/dev/null 2>&1; then\n\techo \"agent-toolkit requires Bun. Install Bun, then rerun this command.\" >&2\n\texit 1\nfi\n\nif [ -f bin/agent-toolkit.ts ]; then\n\tbun bin/agent-toolkit.ts repo check \"$@\"\nelse\n\tbunx @harryy/agent-toolkit repo check \"$@\"\nfi\n\nif [ \"${AGENT_TOOLKIT_SYNC_CHECK:-}\" = \"1\" ] && command -v agents >/dev/null 2>&1; then\n\tagents sync --path . --check\nfi\n",
+    ]
 }
 
 fn agents_json() -> &'static str {
@@ -278,6 +302,35 @@ fn agents_json() -> &'static str {
 
 fn agents_readme() -> &'static str {
     "# .agents\n\nProject-local source files for agent setup.\n\n- `agents.json`: cross-agent sync config\n- `skills/`: committed project skills, including vendored DotAgent skills when `agent-toolkit repo dotagent` is used\n- `dotagent/`: vendored DotAgent role-profile and command references when DotAgent is installed for the repo\n- `dotagent.lock.json`: pinned DotAgent rules and skills snapshot when DotAgent is installed for the repo\n- `intel/`: generated repo intelligence that may be committed in migrated repos. Agents should start at `intel/summary.md`, use `intel/manifest.json` for read-policy tiers, and treat `repo.json`, `database.md`, `imports.md`, and `calls.md` as deep-read only.\n- `local.json`: machine-specific overrides, ignored by git\n"
+}
+
+fn ensure_agent_check_script(
+    root: &Path,
+    changes: &mut Vec<BootstrapChange>,
+) -> std::io::Result<()> {
+    let relative_path = "scripts/agent-check";
+    let path = root.join(relative_path);
+    if !path.exists() {
+        create_file_if_missing(root, relative_path, agent_check_script(), changes)?;
+        return Ok(());
+    }
+
+    let existing = fs::read_to_string(&path)?;
+    let latest = agent_check_script();
+    if existing == latest || !is_managed_agent_check_script(&existing) {
+        return Ok(());
+    }
+
+    fs::write(path, latest)?;
+    changes.push(BootstrapChange::updated(relative_path));
+    Ok(())
+}
+
+fn is_managed_agent_check_script(contents: &str) -> bool {
+    contents.contains("# agent-toolkit:managed-script")
+        || legacy_agent_check_scripts()
+            .iter()
+            .any(|legacy| contents == *legacy)
 }
 
 fn create_file_if_missing(
@@ -712,6 +765,9 @@ mod tests {
         assert!(!gitignore.contains("/.cursor/"));
         assert!(!gitignore.contains("/.gemini/"));
         let agent_check = fs::read_to_string(root.join("scripts/agent-check")).unwrap();
+        assert!(agent_check.contains("# agent-toolkit:managed-script"));
+        assert!(agent_check.contains("AGENT_TOOLKIT_BIN"));
+        assert!(agent_check.contains("bun bin/agent-toolkit.ts repo check"));
         assert!(agent_check.contains("Skipping agent-check in CI pre-commit"));
         let pre_commit = fs::read_to_string(root.join(".husky/pre-commit")).unwrap();
         assert!(!pre_commit.contains("Skipping agent-check in CI pre-commit"));
@@ -845,6 +901,49 @@ mod tests {
             &second_changes,
             BootstrapChangeKind::Updated,
             ".agents/agents.json"
+        ));
+    }
+
+    #[test]
+    fn bootstrap_repo_updates_legacy_agent_check_script() {
+        for legacy_script in legacy_agent_check_scripts() {
+            let root = temp_dir();
+            fs::create_dir_all(root.join("scripts")).unwrap();
+            fs::write(root.join("scripts/agent-check"), legacy_script).unwrap();
+
+            let first_changes = bootstrap_repo(&root).unwrap();
+            let second_changes = bootstrap_repo(&root).unwrap();
+
+            let agent_check = fs::read_to_string(root.join("scripts/agent-check")).unwrap();
+            assert_eq!(agent_check, agent_check_script());
+            assert!(has_change(
+                &first_changes,
+                BootstrapChangeKind::Updated,
+                "scripts/agent-check"
+            ));
+            assert!(!has_change(
+                &second_changes,
+                BootstrapChangeKind::Updated,
+                "scripts/agent-check"
+            ));
+        }
+    }
+
+    #[test]
+    fn bootstrap_repo_preserves_custom_agent_check_script() {
+        let root = temp_dir();
+        let custom_script = "#!/bin/sh\nset -eu\n\necho custom agent check\n";
+        fs::create_dir_all(root.join("scripts")).unwrap();
+        fs::write(root.join("scripts/agent-check"), custom_script).unwrap();
+
+        let changes = bootstrap_repo(&root).unwrap();
+
+        let agent_check = fs::read_to_string(root.join("scripts/agent-check")).unwrap();
+        assert_eq!(agent_check, custom_script);
+        assert!(!has_change(
+            &changes,
+            BootstrapChangeKind::Updated,
+            "scripts/agent-check"
         ));
     }
 

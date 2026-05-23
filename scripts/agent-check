@@ -1,4 +1,5 @@
 #!/bin/sh
+# agent-toolkit:managed-script
 set -eu
 
 if [ "${1:-}" = "--staged" ] && { [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:-}" = "true" ]; }; then
@@ -6,12 +7,14 @@ if [ "${1:-}" = "--staged" ] && { [ "${CI:-}" = "true" ] || [ "${GITHUB_ACTIONS:
 	exit 0
 fi
 
-if ! command -v bun >/dev/null 2>&1; then
+if [ -z "${AGENT_TOOLKIT_BIN:-}" ] && ! command -v bun >/dev/null 2>&1; then
 	echo "agent-toolkit requires Bun. Install Bun, then rerun this command." >&2
 	exit 1
 fi
 
-if [ -f bin/agent-toolkit.ts ]; then
+if [ -n "${AGENT_TOOLKIT_BIN:-}" ]; then
+	"$AGENT_TOOLKIT_BIN" repo check "$@"
+elif [ -f bin/agent-toolkit.ts ]; then
 	bun bin/agent-toolkit.ts repo check "$@"
 else
 	bunx @harryy/agent-toolkit repo check "$@"
