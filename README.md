@@ -297,6 +297,8 @@ bun run build:native
 bun bin/agent-toolkit.ts repo check
 ```
 
+`bun run build:native` reuses `bin/native/<target>` when the cached artifact manifest matches the current native build inputs. Set `AGENT_TOOLKIT_BUILD_NATIVE_FORCE=1` to force a rebuild.
+
 Do not use JavaScript source files, `tsc`, ESLint, or Prettier in this repo. Use TypeScript with Bun, `oxlint --type-aware --type-check`, and `oxfmt`.
 
 ---

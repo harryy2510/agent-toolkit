@@ -95,6 +95,14 @@ jobs:
       - name: Apply release version
         run: bun scripts/bump-version.ts ${{ needs.prepare.outputs.version }}
 
+      - name: Restore native build artifact cache
+        uses: actions/cache@v4
+        with:
+          path: bin/native/${{ matrix.target_key }}
+          key: native-${{ runner.os }}-${{ matrix.target_key }}-${{ hashFiles('Cargo.toml', 'Cargo.lock', 'crates/**', 'scripts/build-native.ts', 'src/platform.ts') }}
+          restore-keys: |
+            native-${{ runner.os }}-${{ matrix.target_key }}-
+
       - run: bun install
 
       - run: bun test

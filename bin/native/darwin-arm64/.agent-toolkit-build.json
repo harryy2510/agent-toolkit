@@ -1,0 +1,6 @@
+{
+	"executable": "agent-toolkit",
+	"inputHash": "0116d567bce50e5100bddf00a30cd15aa8422a7fe0460044422e55d8b4b4c34a",
+	"schemaVersion": 1,
+	"target": "darwin-arm64"
+}
