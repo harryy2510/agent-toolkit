@@ -145,4 +145,3 @@ Function and method call names extracted from the JS/TS AST. Use this to find fr
 - `test`
 - `tmpdir`
 - `writeFileSync`
-

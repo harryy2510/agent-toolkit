@@ -1,0 +1,30 @@
+{
+	"printWidth": 100,
+	"useTabs": true,
+	"semi": false,
+	"singleQuote": true,
+	"trailingComma": "none",
+	"bracketSpacing": true,
+	"arrowParens": "always",
+	"sortImports": true,
+	"sortTailwindcss": true,
+	"ignorePatterns": [
+		"node_modules/",
+		".pnpm-store/",
+		"dist/",
+		".output/",
+		".wrangler/",
+		"routeTree.gen.ts",
+		"worker-configuration.d.ts",
+		"supabase/.branches/",
+		"supabase/.temp/",
+		"supabase/emails/",
+		".idea/",
+		".vscode/",
+		"docs/api/",
+		"*.min.js",
+		"*.min.css",
+		"pnpm-lock.yaml",
+		"bun.lock"
+	]
+}

@@ -38,6 +38,7 @@ This repository is the Agent Toolkit package and marketplace index for Hariom Sh
 - Keep changes scoped to the requested package, marketplace, or documentation surface.
 
 <!-- AGENT-TOOLKIT:REPO-INTEL:START -->
+
 ## Agent Toolkit Repo Intelligence
 
 - Before broad exploration, read `.agents/intel/summary.md` if it exists.

@@ -27,4 +27,3 @@ Local import adjacency grouped by source file. Use this to follow dependencies w
 
 - `src/native.ts`
 - `src/platform.ts`
-

@@ -2,9 +2,7 @@
 	"compilerOptions": {
 		"allowImportingTsExtensions": true,
 		"allowSyntheticDefaultImports": true,
-		"lib": [
-			"ESNext"
-		],
+		"lib": ["ESNext"],
 		"module": "Preserve",
 		"moduleDetection": "force",
 		"moduleResolution": "Bundler",
@@ -15,15 +13,8 @@
 		"skipLibCheck": true,
 		"strict": true,
 		"target": "ESNext",
-		"types": [
-			"bun"
-		],
+		"types": ["bun"],
 		"verbatimModuleSyntax": true
 	},
-	"include": [
-		"bin/**/*.ts",
-		"scripts/**/*.ts",
-		"src/**/*.ts",
-		"test/**/*.ts"
-	]
+	"include": ["bin/**/*.ts", "scripts/**/*.ts", "src/**/*.ts", "test/**/*.ts"]
 }

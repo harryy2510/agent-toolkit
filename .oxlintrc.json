@@ -1,7 +1,15 @@
 {
-	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"options": {
-		"typeAware": true,
-		"typeCheck": true
-	}
+	"$schema": "https://raw.githubusercontent.com/nicolo-ribaudo/oxlint/head/npm/oxlint/configuration_schema.json",
+	"rules": {
+		"no-unused-vars": "warn",
+		"no-console": "warn",
+		"eqeqeq": "error",
+		"no-var": "error",
+		"prefer-const": "error",
+		"no-debugger": "error",
+		"no-alert": "error",
+		"no-eval": "error",
+		"no-implied-eval": "error"
+	},
+	"ignorePatterns": ["node_modules", "dist", ".wrangler", "*.gen.ts"]
 }

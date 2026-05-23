@@ -38,4 +38,3 @@ Use this before editing high-impact files. Each plan lists the file itself, dire
 - Check direct dependents:
   - `bin/agent-toolkit.ts`
 - Relevant intel: `graph.md`, `symbols.md`, `files.md`
-

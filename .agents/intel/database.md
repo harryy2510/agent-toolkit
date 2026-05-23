@@ -20,7 +20,6 @@ pg_query-backed ordered static database map for agents. This reduces migration f
 
 ## SQL Timeline
 
-
 ## Relationship Map
 
 - No foreign-key style references detected.
@@ -29,9 +28,6 @@ pg_query-backed ordered static database map for agents. This reduces migration f
 
 ## Functions And RPCs
 
-
 ## Types And Views
 
-
 ## Drops And Replacements
-

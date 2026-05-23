@@ -11,14 +11,9 @@ describe('bump-version script', () => {
 		writeFileSync(rootFile(root, 'package.json'), JSON.stringify({ version: '0.1.0' }))
 		writeFileSync(
 			rootFile(root, 'Cargo.toml'),
-			[
-				'[workspace]',
-				'resolver = "2"',
-				'',
-				'[workspace.package]',
-				'version = "0.1.0"',
-				'',
-			].join('\n'),
+			['[workspace]', 'resolver = "2"', '', '[workspace.package]', 'version = "0.1.0"', ''].join(
+				'\n'
+			)
 		)
 		writeFileSync(
 			rootFile(root, 'Cargo.lock'),
@@ -36,15 +31,15 @@ describe('bump-version script', () => {
 				'[[package]]',
 				'name = "agent-toolkit-core"',
 				'version = "0.1.0"',
-				'',
-			].join('\r\n'),
+				''
+			].join('\r\n')
 		)
 
 		const result = Bun.spawnSync({
 			cmd: ['bun', scriptPath, '0.1.1'],
 			cwd: root,
 			stderr: 'pipe',
-			stdout: 'pipe',
+			stdout: 'pipe'
 		})
 
 		expect(result.exitCode).toBe(0)

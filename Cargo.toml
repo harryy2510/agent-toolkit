@@ -1,9 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-	"crates/agent-toolkit-core",
-	"crates/agent-toolkit-cli",
-]
+members = ["crates/agent-toolkit-core", "crates/agent-toolkit-cli"]
 
 [workspace.package]
 edition = "2021"

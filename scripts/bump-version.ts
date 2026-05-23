@@ -27,7 +27,7 @@ function updateCargoToml(version: string): void {
 		contents,
 		/(\[workspace\.package\][\s\S]*?\nversion = ")[^"]+(")/,
 		version,
-		path,
+		path
 	)
 	writeFileSync(path, updated)
 }
@@ -44,20 +44,15 @@ function replacePackageVersion(
 	contents: string,
 	packageName: string,
 	version: string,
-	path: string,
+	path: string
 ): string {
 	const pattern = new RegExp(
-		`(\\[\\[package\\]\\]\\r?\\nname = "${escapeRegExp(packageName)}"\\r?\\nversion = ")[^"]+(")`,
+		`(\\[\\[package\\]\\]\\r?\\nname = "${escapeRegExp(packageName)}"\\r?\\nversion = ")[^"]+(")`
 	)
 	return replaceRequired(contents, pattern, version, path)
 }
 
-function replaceRequired(
-	contents: string,
-	pattern: RegExp,
-	version: string,
-	path: string,
-): string {
+function replaceRequired(contents: string, pattern: RegExp, version: string, path: string): string {
 	let replacements = 0
 	const updated = contents.replace(pattern, (_match: string, prefix: string, suffix: string) => {
 		replacements += 1

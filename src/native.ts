@@ -17,7 +17,9 @@ export type NativeCommandResolution = {
 	error: string | null
 }
 
-export function nativePlatformKey(options: Pick<NativeRunOptions, 'arch' | 'platform'> = {}): string {
+export function nativePlatformKey(
+	options: Pick<NativeRunOptions, 'arch' | 'platform'> = {}
+): string {
 	return platformKey(options.platform, options.arch)
 }
 
@@ -31,13 +33,7 @@ export function nativeBinaryCandidates(options: NativeRunOptions): Array<string>
 
 	const executableName = binaryName(options.platform)
 	candidates.push(
-		join(
-			options.packageRoot,
-			'bin',
-			'native',
-			nativePlatformKey(options),
-			executableName,
-		),
+		join(options.packageRoot, 'bin', 'native', nativePlatformKey(options), executableName)
 	)
 
 	return candidates
@@ -49,7 +45,7 @@ export function findNativeBinary(options: NativeRunOptions): string | null {
 
 export function resolveNativeCommand(
 	args: Array<string>,
-	options: NativeRunOptions,
+	options: NativeRunOptions
 ): NativeCommandResolution {
 	const callerCwd = options.cwd ?? process.cwd()
 	const env = options.env ?? process.env
@@ -58,7 +54,7 @@ export function resolveNativeCommand(
 		return {
 			command: [explicitBinary, ...args],
 			cwd: callerCwd,
-			error: null,
+			error: null
 		}
 	}
 
@@ -73,10 +69,10 @@ export function resolveNativeCommand(
 				'agent-toolkit',
 				'--quiet',
 				'--',
-				...args,
+				...args
 			],
 			cwd: callerCwd,
-			error: null,
+			error: null
 		}
 	}
 
@@ -85,7 +81,7 @@ export function resolveNativeCommand(
 		return {
 			command: [binary, ...args],
 			cwd: callerCwd,
-			error: null,
+			error: null
 		}
 	}
 
@@ -95,8 +91,8 @@ export function resolveNativeCommand(
 		error: [
 			`No bundled agent-toolkit native binary found for ${nativePlatformKey(options)}.`,
 			'Install a supported release or build from source in a git checkout.',
-			'End users should not need Rust installed.',
-		].join(' '),
+			'End users should not need Rust installed.'
+		].join(' ')
 	}
 }
 
@@ -113,7 +109,7 @@ export async function runNative(args: Array<string>, options: NativeRunOptions):
 		env: { ...process.env, ...options.env },
 		stdin: 'inherit',
 		stdout: 'inherit',
-		stderr: 'inherit',
+		stderr: 'inherit'
 	})
 
 	return result.exitCode

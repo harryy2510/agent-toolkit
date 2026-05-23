@@ -6,7 +6,7 @@ import { dirname, join, relative } from 'node:path'
 import {
 	buildNative,
 	nativeBuildInputFiles,
-	nativeBuildInputHash,
+	nativeBuildInputHash
 } from '../scripts/build-native.ts'
 
 const manifestName = '.agent-toolkit-build.json'
@@ -36,7 +36,7 @@ describe('build-native cache', () => {
 		const root = buildFixture()
 		writeFileSync(
 			rootFile(root, 'crates/agent-toolkit-cli/src/main.rs'),
-			'fn main() { println!("{}", env!("CARGO_PKG_VERSION")); }\n',
+			'fn main() { println!("{}", env!("CARGO_PKG_VERSION")); }\n'
 		)
 		const before = nativeBuildInputHash(root)
 
@@ -63,7 +63,7 @@ describe('build-native cache', () => {
 				builds += 1
 				return { exitCode: 0 }
 			},
-			targetKey,
+			targetKey
 		})
 
 		expect(exitCode).toBe(0)
@@ -86,8 +86,8 @@ describe('build-native cache', () => {
 				executable: 'agent-toolkit',
 				inputHash: 'old',
 				schemaVersion: 1,
-				target: targetKey,
-			})}\n`,
+				target: targetKey
+			})}\n`
 		)
 		let builds = 0
 
@@ -99,7 +99,7 @@ describe('build-native cache', () => {
 				builds += 1
 				return { exitCode: 0 }
 			},
-			targetKey,
+			targetKey
 		})
 
 		const updatedManifest = JSON.parse(readFileSync(manifest, 'utf8')) as { inputHash?: string }
@@ -123,19 +123,19 @@ function buildFixture(): string {
 			'[[package]]',
 			'name = "agent-toolkit-core"',
 			'version = "0.1.0"',
-			'',
-		].join('\n'),
+			''
+		].join('\n')
 	)
 	writeRootFile(
 		root,
 		'Cargo.toml',
-		['[workspace]', '', '[workspace.package]', 'version = "0.1.0"', ''].join('\n'),
+		['[workspace]', '', '[workspace.package]', 'version = "0.1.0"', ''].join('\n')
 	)
 	writeRootFile(root, 'scripts/build-native.ts', '#!/usr/bin/env bun\n')
 	writeRootFile(
 		root,
 		'src/platform.ts',
-		'export function binaryName() { return "agent-toolkit" }\n',
+		'export function binaryName() { return "agent-toolkit" }\n'
 	)
 	writeRootFile(root, 'crates/agent-toolkit-cli/Cargo.toml', '[package]\n')
 	writeRootFile(root, 'crates/agent-toolkit-cli/src/main.rs', 'fn main() { println!("old"); }\n')
@@ -150,16 +150,16 @@ function bumpWorkspaceVersion(root: string, version: string): void {
 		'Cargo.toml',
 		readFileSync(rootFile(root, 'Cargo.toml'), 'utf8').replace(
 			/version = "0\.1\.0"/,
-			`version = "${version}"`,
-		),
+			`version = "${version}"`
+		)
 	)
 	writeRootFile(
 		root,
 		'Cargo.lock',
 		readFileSync(rootFile(root, 'Cargo.lock'), 'utf8').replaceAll(
 			'version = "0.1.0"',
-			`version = "${version}"`,
-		),
+			`version = "${version}"`
+		)
 	)
 }
 
@@ -169,10 +169,10 @@ function buildManifest(root: string, targetKey: string): string {
 			executable: 'agent-toolkit',
 			inputHash: nativeBuildInputHash(root),
 			schemaVersion: 1,
-			target: targetKey,
+			target: targetKey
 		},
 		null,
-		'\t',
+		'\t'
 	)}\n`
 }
 

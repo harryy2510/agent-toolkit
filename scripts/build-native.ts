@@ -7,7 +7,7 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
-	writeFileSync,
+	writeFileSync
 } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -67,7 +67,7 @@ export function buildNative(options: BuildNativeOptions = {}): number {
 		executable,
 		inputHash,
 		schemaVersion: buildManifestVersion,
-		target: key,
+		target: key
 	}
 
 	if (!forceBuild(env) && cachedArtifactMatches(manifestPath, destination, manifest)) {
@@ -82,7 +82,7 @@ export function buildNative(options: BuildNativeOptions = {}): number {
 		cwd: packageRoot,
 		stdin: 'inherit',
 		stdout: 'inherit',
-		stderr: 'inherit',
+		stderr: 'inherit'
 	})
 
 	if (build.exitCode !== 0) {
@@ -119,7 +119,7 @@ export function nativeBuildInputHash(packageRoot: string): string {
 
 export function nativeBuildInputFiles(packageRoot: string): Array<string> {
 	const files = ['Cargo.lock', 'Cargo.toml', 'scripts/build-native.ts', 'src/platform.ts'].flatMap(
-		(path) => existingFile(join(packageRoot, path)),
+		(path) => existingFile(join(packageRoot, path))
 	)
 
 	for (const directory of ['crates', '.cargo']) {
@@ -132,7 +132,7 @@ export function nativeBuildInputFiles(packageRoot: string): Array<string> {
 function cachedArtifactMatches(
 	manifestPath: string,
 	destination: string,
-	expected: BuildManifest,
+	expected: BuildManifest
 ): boolean {
 	if (!existsSync(destination) || !existsSync(manifestPath)) {
 		return false
@@ -184,7 +184,7 @@ function forceBuild(env: Record<string, string | undefined>): boolean {
 function nativeBuildInputContents(
 	file: string,
 	relativePath: string,
-	includePackageVersion: boolean,
+	includePackageVersion: boolean
 ): Buffer | string {
 	if (includePackageVersion) {
 		return readFileSync(file)
@@ -193,7 +193,7 @@ function nativeBuildInputContents(
 	if (relativePath === 'Cargo.toml') {
 		return readFileSync(file, 'utf8').replace(
 			/(\[workspace\.package\][\s\S]*?\r?\nversion = ")[^"]+(")/,
-			'$1<workspace-version>$2',
+			'$1<workspace-version>$2'
 		)
 	}
 
@@ -206,7 +206,7 @@ function nativeBuildInputContents(
 
 function nativeSourceUsesCargoPackageVersion(packageRoot: string): boolean {
 	return collectFiles(join(packageRoot, 'crates')).some((file) =>
-		readFileSync(file, 'utf8').includes('CARGO_PKG_'),
+		readFileSync(file, 'utf8').includes('CARGO_PKG_')
 	)
 }
 
@@ -216,10 +216,10 @@ function normalizeWorkspacePackageVersions(contents: string): string {
 			updated.replace(
 				new RegExp(
 					`(\\[\\[package\\]\\]\\r?\\nname = "${packageName}"\\r?\\nversion = ")[^"]+(")`,
-					'g',
+					'g'
 				),
-				'$1<workspace-version>$2',
+				'$1<workspace-version>$2'
 			),
-		contents,
+		contents
 	)
 }

@@ -1,44 +1,44 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "agent-toolkit",
-  "description": "Curated agent plugins by Hariom Sharma",
-  "owner": {
-    "name": "Hariom Sharma",
-    "email": "harryy2510@gmail.com"
-  },
-  "plugins": [
-    {
-      "name": "dotagent",
-      "description": "Code conventions, 20 agents, 21 skills, and tooling for all projects",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/harryy2510/dotagent.git",
-        "path": "plugins/dotagent",
-        "ref": "main"
-      },
-      "category": "development"
-    },
-    {
-      "name": "vibe-pilot",
-      "description": "AI kanban autopilot skills for classify, triage, and status reports",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/harryy2510/vibe-pilot.git",
-        "path": "plugins/vibe-pilot",
-        "ref": "main"
-      },
-      "category": "development"
-    },
-    {
-      "name": "web-smith",
-      "description": "Website cloning and static site optimization skills for Lighthouse-focused builds",
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/harryy2510/web-smith.git",
-        "path": "plugins/web-smith",
-        "ref": "main"
-      },
-      "category": "development"
-    }
-  ]
+	"$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+	"name": "agent-toolkit",
+	"description": "Curated agent plugins by Hariom Sharma",
+	"owner": {
+		"name": "Hariom Sharma",
+		"email": "harryy2510@gmail.com"
+	},
+	"plugins": [
+		{
+			"name": "dotagent",
+			"description": "Code conventions, 20 agents, 21 skills, and tooling for all projects",
+			"source": {
+				"source": "git-subdir",
+				"url": "https://github.com/harryy2510/dotagent.git",
+				"path": "plugins/dotagent",
+				"ref": "main"
+			},
+			"category": "development"
+		},
+		{
+			"name": "vibe-pilot",
+			"description": "AI kanban autopilot skills for classify, triage, and status reports",
+			"source": {
+				"source": "git-subdir",
+				"url": "https://github.com/harryy2510/vibe-pilot.git",
+				"path": "plugins/vibe-pilot",
+				"ref": "main"
+			},
+			"category": "development"
+		},
+		{
+			"name": "web-smith",
+			"description": "Website cloning and static site optimization skills for Lighthouse-focused builds",
+			"source": {
+				"source": "git-subdir",
+				"url": "https://github.com/harryy2510/web-smith.git",
+				"path": "plugins/web-smith",
+				"ref": "main"
+			},
+			"category": "development"
+		}
+	]
 }

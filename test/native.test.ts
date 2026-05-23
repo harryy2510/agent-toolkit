@@ -7,7 +7,7 @@ import {
 	findNativeBinary,
 	nativeBinaryCandidates,
 	nativePlatformKey,
-	resolveNativeCommand,
+	resolveNativeCommand
 } from '../src/native.ts'
 import { binaryName } from '../src/platform.ts'
 
@@ -16,8 +16,8 @@ describe('native binary resolution', () => {
 		const candidates = nativeBinaryCandidates({
 			packageRoot: '/toolkit',
 			env: {
-				AGENT_TOOLKIT_NATIVE: '/custom/agent-toolkit',
-			},
+				AGENT_TOOLKIT_NATIVE: '/custom/agent-toolkit'
+			}
 		})
 
 		expect(candidates[0]).toBe('/custom/agent-toolkit')
@@ -42,7 +42,7 @@ describe('native binary resolution', () => {
 		const command = resolveNativeCommand(['repo', 'migrate'], {
 			packageRoot: root,
 			cwd: callerCwd,
-			env: {},
+			env: {}
 		})
 
 		expect(command.command).toEqual([binary, 'repo', 'migrate'])
@@ -56,7 +56,7 @@ describe('native binary resolution', () => {
 
 		const command = resolveNativeCommand(['repo', 'check'], {
 			packageRoot: root,
-			env: {},
+			env: {}
 		})
 
 		expect(command.command).toBeNull()
@@ -74,7 +74,7 @@ describe('native binary resolution', () => {
 		const command = resolveNativeCommand(['repo', 'check'], {
 			packageRoot: root,
 			cwd: callerCwd,
-			env: {},
+			env: {}
 		})
 
 		expect(command.command).toEqual([
@@ -87,7 +87,7 @@ describe('native binary resolution', () => {
 			'--quiet',
 			'--',
 			'repo',
-			'check',
+			'check'
 		])
 		expect(command.cwd).toBe(callerCwd)
 		expect(command.error).toBeNull()
@@ -104,7 +104,7 @@ describe('native binary resolution', () => {
 		const command = resolveNativeCommand(['repo', 'check'], {
 			packageRoot: root,
 			cwd: callerCwd,
-			env: {},
+			env: {}
 		})
 
 		expect(command.command?.slice(0, 8)).toEqual([
@@ -115,7 +115,7 @@ describe('native binary resolution', () => {
 			'-p',
 			'agent-toolkit',
 			'--quiet',
-			'--',
+			'--'
 		])
 		expect(command.cwd).toBe(callerCwd)
 		expect(command.error).toBeNull()

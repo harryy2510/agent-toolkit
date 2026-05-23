@@ -65,4 +65,3 @@ Every source-like file discovered by the repo intelligence scanner. Tags are heu
 ## `test/native.test.ts`
 
 - `test/native.test.ts` — 115 lines — tags: test, ast
-

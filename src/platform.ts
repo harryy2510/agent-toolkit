@@ -1,6 +1,6 @@
 export function platformKey(
 	platform: NodeJS.Platform = process.platform,
-	arch: string = process.arch,
+	arch: string = process.arch
 ): string {
 	return `${platform}-${arch}`
 }

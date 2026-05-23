@@ -45,7 +45,6 @@
 
 - [`repo.json`](./repo.json) — machine-readable full repo intelligence payload
 
-
 ## Quick Stats
 
 - Source-like files: 28
