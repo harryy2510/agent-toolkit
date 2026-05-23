@@ -1,36 +1,40 @@
 {
-	"name": "@harryy/agent-toolkit",
-	"version": "0.1.31",
-	"description": "Fast agent-agnostic setup, repo intelligence, and enforcement CLI.",
-	"type": "module",
-	"bin": {
-		"agent-toolkit": "./bin/agent-toolkit.ts",
-		"atk": "./bin/agent-toolkit.ts"
-	},
-	"files": [
-		"bin",
-		"src",
-		"crates",
-		"Cargo.toml",
-		"README.md",
-		"AGENTS.md",
-		".claude-plugin"
-	],
-	"scripts": {
-		"build:native": "bun scripts/build-native.ts",
-		"test": "bun test",
-		"test:rust": "cargo test",
-		"check": "bun test && cargo test && oxlint --type-aware --type-check bin src scripts test",
-		"format": "oxfmt -w ."
-	},
-	"devDependencies": {
-		"@types/bun": "latest",
-		"oxfmt": "latest",
-		"oxlint": "latest",
-		"oxlint-tsgolint": "latest"
-	},
-	"engines": {
-		"bun": ">=1.2.0"
-	},
-	"license": "MIT"
+  "name": "@harryy/agent-toolkit",
+  "version": "0.1.31",
+  "description": "Fast agent-agnostic setup, repo intelligence, and enforcement CLI.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harryy2510/agent-toolkit"
+  },
+  "bin": {
+    "agent-toolkit": "./bin/agent-toolkit.ts",
+    "atk": "./bin/agent-toolkit.ts"
+  },
+  "files": [
+    "bin",
+    "src",
+    "crates",
+    "Cargo.toml",
+    "README.md",
+    "AGENTS.md",
+    ".claude-plugin"
+  ],
+  "type": "module",
+  "scripts": {
+    "build:native": "bun scripts/build-native.ts",
+    "test": "bun test",
+    "test:rust": "cargo test",
+    "check": "bun test && cargo test && oxlint --type-aware --type-check bin src scripts test",
+    "format": "oxfmt -w ."
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "latest",
+    "oxlint": "latest",
+    "oxlint-tsgolint": "latest"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  }
 }
