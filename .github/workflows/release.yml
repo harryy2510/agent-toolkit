@@ -5,18 +5,18 @@ on:
     branches:
       - main
     paths:
-      - '.claude-plugin/**'
-      - 'AGENTS.md'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
-      - 'README.md'
-      - 'bin/**'
-      - 'bun.lock'
-      - 'crates/**'
-      - 'package.json'
-      - 'scripts/**'
-      - 'src/**'
-      - 'test/**'
+      - ".claude-plugin/**"
+      - "AGENTS.md"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "README.md"
+      - "bin/**"
+      - "bun.lock"
+      - "crates/**"
+      - "package.json"
+      - "scripts/**"
+      - "src/**"
+      - "test/**"
   workflow_dispatch:
 
 permissions:
@@ -154,9 +154,7 @@ jobs:
 
       - run: cargo test
 
-      - run: bun publish --access public --no-git-checks
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --access public
 
       - name: Commit version bump and tag release
         run: |
