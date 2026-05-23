@@ -12,6 +12,7 @@ pub enum IssueCode {
     MissingAgentsIntegration,
     MissingAgentCheckScript,
     MissingGitHook,
+    UnsafeGitHook,
     MissingHookManagerInstructions,
     DisallowedTrackedFile,
     JavaScriptSource,
@@ -96,14 +97,7 @@ pub fn check_repo(root: &Path) -> Vec<RepoIssue> {
         "Conventional Commit",
         "commit-msg hook must enforce Conventional Commit messages",
     );
-    push_missing_hook_issue(
-        &mut issues,
-        root,
-        hook_layout,
-        "post-checkout",
-        "bun install",
-        "post-checkout hook must run bun install",
-    );
+    push_unsafe_post_checkout_issue(&mut issues, root, hook_layout);
 
     push_disallowed_tracked_file_issues(root, &mut issues);
 
@@ -284,6 +278,23 @@ fn push_missing_hook_issue(
         issues.push(RepoIssue {
             code: IssueCode::MissingGitHook,
             message: format!("{relative_path}: repo {} {message}", layout.label),
+        });
+    }
+}
+
+fn push_unsafe_post_checkout_issue(issues: &mut Vec<RepoIssue>, root: &Path, layout: HookLayout) {
+    let relative_path = hook_source_path(layout, "post-checkout");
+    let path = root.join(&relative_path);
+    let Ok(contents) = fs::read_to_string(&path) else {
+        return;
+    };
+
+    if contents.contains("bun install") {
+        issues.push(RepoIssue {
+            code: IssueCode::UnsafeGitHook,
+            message: format!(
+                "{relative_path}: post-checkout hooks must not run bun install; install dependencies explicitly after checkout"
+            ),
         });
     }
 }
@@ -636,6 +647,24 @@ mod tests {
         assert!(issues.iter().any(|issue| {
             issue.code == IssueCode::MissingGitHook
                 && issue.message.contains("scripts/agent-check --staged")
+        }));
+    }
+
+    #[test]
+    fn check_repo_reports_post_checkout_hooks_that_run_bun_install() {
+        let root = temp_dir();
+        write_minimal_repo_files_with_hooks(&root, ".husky");
+        fs::write(
+            root.join(".husky/post-checkout"),
+            "#!/bin/sh\nset -eu\n\nbun install\n",
+        )
+        .unwrap();
+
+        let issues = check_repo(&root);
+
+        assert!(issues.iter().any(|issue| {
+            issue.code == IssueCode::UnsafeGitHook
+                && issue.message.contains("must not run bun install")
         }));
     }
 
@@ -1082,11 +1111,6 @@ mod tests {
         fs::write(
             root.join(hook_dir).join("commit-msg"),
             "#!/bin/sh\necho \"Conventional Commit\"\n",
-        )
-        .unwrap();
-        fs::write(
-            root.join(hook_dir).join("post-checkout"),
-            "#!/bin/sh\nbun install\n",
         )
         .unwrap();
     }

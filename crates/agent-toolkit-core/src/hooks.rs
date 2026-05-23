@@ -199,12 +199,9 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
         commit_msg_agent_check_block(),
         &mut changes,
     )?;
-    ensure_hook(
+    remove_managed_post_checkout_install(
         root,
         &hook_source_path(hook_layout, "post-checkout"),
-        post_checkout_hook(),
-        "bun install",
-        post_checkout_agent_check_block(),
         &mut changes,
     )?;
     ensure_gitignore_entries(root, &mut changes)?;
@@ -219,10 +216,6 @@ pub fn bootstrap_repo(root: &Path) -> std::io::Result<Vec<BootstrapChange>> {
     )?;
     make_executable(
         root.join(hook_source_path(hook_layout, "commit-msg"))
-            .as_path(),
-    )?;
-    make_executable(
-        root.join(hook_source_path(hook_layout, "post-checkout"))
             .as_path(),
     )?;
     configure_git_hooks_path(root, hook_layout);
@@ -255,7 +248,7 @@ fn pre_push_hook() -> &'static str {
     "#!/bin/sh\nset -eu\n\nscripts/agent-check\n"
 }
 
-fn post_checkout_hook() -> &'static str {
+fn old_post_checkout_install_hook() -> &'static str {
     "#!/bin/sh\nset -eu\n\nbun install\n"
 }
 
@@ -271,7 +264,7 @@ fn commit_msg_agent_check_block() -> &'static str {
     "# agent-toolkit:start\nfirst_line=$(sed -n '1p' \"$1\")\n\nif ! printf '%s\\n' \"$first_line\" | grep -Eq '^[a-z0-9-]+(\\([a-z0-9._/-]+(,[a-z0-9._/-]+)*\\))?!?: .+'; then\n\techo \"Commit message must use Conventional Commit format, for example: feat: add repo intelligence\" >&2\n\texit 1\nfi\n# agent-toolkit:end\n"
 }
 
-fn post_checkout_agent_check_block() -> &'static str {
+fn old_post_checkout_install_block() -> &'static str {
     "# agent-toolkit:start\nbun install\n# agent-toolkit:end\n"
 }
 
@@ -419,6 +412,52 @@ fn ensure_hook(
     fs::write(path, updated)?;
     changes.push(BootstrapChange::updated(relative_path));
     Ok(())
+}
+
+fn remove_managed_post_checkout_install(
+    root: &Path,
+    relative_path: &str,
+    changes: &mut Vec<BootstrapChange>,
+) -> std::io::Result<()> {
+    let path = root.join(relative_path);
+    let Ok(existing) = fs::read_to_string(&path) else {
+        return Ok(());
+    };
+
+    if existing == old_post_checkout_install_hook() {
+        fs::remove_file(path)?;
+        changes.push(BootstrapChange::updated(relative_path));
+        return Ok(());
+    }
+
+    let updated = existing.replace(old_post_checkout_install_block(), "");
+    if updated == existing {
+        return Ok(());
+    }
+
+    if hook_has_only_shell_boilerplate(&updated) {
+        fs::remove_file(path)?;
+    } else {
+        let mut updated = updated.trim_end().to_string();
+        updated.push('\n');
+        fs::write(path, updated)?;
+    }
+    changes.push(BootstrapChange::updated(relative_path));
+    Ok(())
+}
+
+fn hook_has_only_shell_boilerplate(contents: &str) -> bool {
+    let meaningful_lines: Vec<&str> = contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+
+    meaningful_lines.is_empty()
+        || meaningful_lines == ["#!/bin/sh"]
+        || meaningful_lines == ["#!/bin/sh", "set -eu"]
+        || meaningful_lines == ["#!/usr/bin/env sh"]
+        || meaningful_lines == ["#!/usr/bin/env sh", "set -eu"]
 }
 
 fn ensure_repo_intel_instructions(
@@ -634,16 +673,11 @@ mod tests {
         ));
         assert!(has_change(
             &changes,
-            BootstrapChangeKind::Created,
-            ".husky/post-checkout"
-        ));
-        assert!(has_change(
-            &changes,
             BootstrapChangeKind::Updated,
             ".gitignore"
         ));
         assert!(root.join(".husky/commit-msg").exists());
-        assert!(root.join(".husky/post-checkout").exists());
+        assert!(!root.join(".husky/post-checkout").exists());
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("Before broad exploration, read `.agents/intel/summary.md`"));
         assert!(agents.contains("repo.json`, `database.md`, `imports.md`, and `calls.md`"));
@@ -681,8 +715,6 @@ mod tests {
         assert!(agent_check.contains("Skipping agent-check in CI pre-commit"));
         let pre_commit = fs::read_to_string(root.join(".husky/pre-commit")).unwrap();
         assert!(!pre_commit.contains("Skipping agent-check in CI pre-commit"));
-        let post_checkout = fs::read_to_string(root.join(".husky/post-checkout")).unwrap();
-        assert!(post_checkout.contains("bun install"));
     }
 
     #[test]
@@ -711,14 +743,9 @@ mod tests {
             BootstrapChangeKind::Created,
             ".vite-hooks/commit-msg"
         ));
-        assert!(has_change(
-            &changes,
-            BootstrapChangeKind::Created,
-            ".vite-hooks/post-checkout"
-        ));
         assert!(!root.join(".husky/pre-commit").exists());
         assert!(root.join(".vite-hooks/commit-msg").exists());
-        assert!(root.join(".vite-hooks/post-checkout").exists());
+        assert!(!root.join(".vite-hooks/post-checkout").exists());
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("This repo uses Vite+ hooks"));
         assert!(agents.contains("Keep `.vite-hooks/` as the active committed hook source"));
@@ -743,7 +770,7 @@ mod tests {
             ".husky/pre-commit"
         ));
         assert!(root.join(".husky/commit-msg").exists());
-        assert!(root.join(".husky/post-checkout").exists());
+        assert!(!root.join(".husky/post-checkout").exists());
         assert!(!root.join(".vite-hooks/pre-commit").exists());
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("This repo uses Husky hooks"));
@@ -909,12 +936,38 @@ mod tests {
     }
 
     #[test]
-    fn bootstrap_repo_integrates_existing_post_checkout_hook_without_overwriting() {
+    fn bootstrap_repo_removes_managed_post_checkout_install_hook() {
         let root = temp_dir();
         fs::create_dir_all(root.join(".husky")).unwrap();
         fs::write(
             root.join(".husky/post-checkout"),
-            "#!/bin/sh\nset -eu\n\necho checked out\n",
+            old_post_checkout_install_hook(),
+        )
+        .unwrap();
+
+        let first_changes = bootstrap_repo(&root).unwrap();
+        let second_changes = bootstrap_repo(&root).unwrap();
+
+        assert!(!root.join(".husky/post-checkout").exists());
+        assert!(has_change(
+            &first_changes,
+            BootstrapChangeKind::Updated,
+            ".husky/post-checkout"
+        ));
+        assert!(!has_change(
+            &second_changes,
+            BootstrapChangeKind::Updated,
+            ".husky/post-checkout"
+        ));
+    }
+
+    #[test]
+    fn bootstrap_repo_removes_managed_post_checkout_install_block_without_overwriting() {
+        let root = temp_dir();
+        fs::create_dir_all(root.join(".husky")).unwrap();
+        fs::write(
+            root.join(".husky/post-checkout"),
+            "#!/bin/sh\nset -eu\n\necho checked out\n\n# agent-toolkit:start\nbun install\n# agent-toolkit:end\n",
         )
         .unwrap();
 
@@ -923,8 +976,8 @@ mod tests {
 
         let hook = fs::read_to_string(root.join(".husky/post-checkout")).unwrap();
         assert!(hook.contains("echo checked out"));
-        assert_eq!(hook.matches("bun install").count(), 1);
-        assert_eq!(hook.matches("# agent-toolkit:start").count(), 1);
+        assert!(!hook.contains("bun install"));
+        assert!(!hook.contains("# agent-toolkit:start"));
         assert!(has_change(
             &first_changes,
             BootstrapChangeKind::Updated,
