@@ -430,14 +430,35 @@ fn should_skip_slop_file(relative_path: &Path) -> bool {
 }
 
 fn has_secret_pattern(contents: &str) -> bool {
-    contains_prefixed_secret(contents, concat!("sk", "_live_"), 20)
+    contains_stripe_live_secret(contents)
         || contains_prefixed_secret(contents, concat!("AK", "IA"), 16)
         || contains_prefixed_secret(contents, concat!("gh", "p_"), 20)
         || contains_prefixed_secret(contents, concat!("xo", "xb-"), 12)
         || contains_env_secret_assignment(contents, concat!("SUPABASE", "_SERVICE_ROLE_KEY"))
 }
 
+fn contains_stripe_live_secret(contents: &str) -> bool {
+    contains_prefixed_secret_matching(
+        contents,
+        concat!("sk", "_live_"),
+        20,
+        is_high_confidence_stripe_live_suffix,
+    )
+}
+
 fn contains_prefixed_secret(contents: &str, prefix: &str, minimum_suffix_len: usize) -> bool {
+    contains_prefixed_secret_matching(contents, prefix, minimum_suffix_len, |_| true)
+}
+
+fn contains_prefixed_secret_matching<F>(
+    contents: &str,
+    prefix: &str,
+    minimum_suffix_len: usize,
+    is_match: F,
+) -> bool
+where
+    F: Fn(&str) -> bool,
+{
     let mut offset = 0usize;
     while let Some(index) = contents[offset..].find(prefix) {
         let start = offset + index + prefix.len();
@@ -447,12 +468,22 @@ fn contains_prefixed_secret(contents: &str, prefix: &str, minimum_suffix_len: us
                 character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.')
             })
             .count();
-        if suffix_len >= minimum_suffix_len {
+        let suffix = &contents[start..start + suffix_len];
+        if suffix_len >= minimum_suffix_len && is_match(suffix) {
             return true;
         }
         offset = start;
     }
     false
+}
+
+fn is_high_confidence_stripe_live_suffix(suffix: &str) -> bool {
+    suffix
+        .chars()
+        .any(|character| character.is_ascii_lowercase())
+        && suffix
+            .chars()
+            .any(|character| character.is_ascii_uppercase())
 }
 
 fn contains_env_secret_assignment(contents: &str, name: &str) -> bool {
@@ -562,6 +593,19 @@ mod tests {
         ));
         fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    fn synthetic_stripe_live_candidate() -> String {
+        format!("{}{}", concat!("sk", "_live_"), "mixedCasePlaceholderValue")
+    }
+
+    #[test]
+    fn stripe_live_detector_ignores_lowercase_placeholders() {
+        assert!(!contains_stripe_live_secret(concat!(
+            "sk",
+            "_live_",
+            "placeholder_value_for_tests"
+        )));
     }
 
     #[test]
@@ -904,10 +948,11 @@ mod tests {
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(
             root.join("src/index.ts"),
-            concat!(
+            format!(
+                "{}{}\nconst candidate = '{}'\n",
                 "console",
-                ".debug('debug')\nconst key = 'sk",
-                "_live_1234567890abcdef1234567890'\n"
+                ".debug('debug')",
+                synthetic_stripe_live_candidate()
             ),
         )
         .unwrap();
@@ -923,13 +968,13 @@ mod tests {
     }
 
     #[test]
-    fn check_repo_reports_realistic_secret_values() {
+    fn check_repo_reports_high_confidence_stripe_live_values() {
         let root = temp_dir();
         write_minimal_repo_files(&root);
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(
             root.join("src/index.ts"),
-            concat!("const key = 'sk", "_live_1234567890abcdef1234567890'\n"),
+            format!("const candidate = '{}'\n", synthetic_stripe_live_candidate()),
         )
         .unwrap();
 
