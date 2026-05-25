@@ -974,7 +974,10 @@ mod tests {
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(
             root.join("src/index.ts"),
-            format!("const candidate = '{}'\n", synthetic_stripe_live_candidate()),
+            format!(
+                "const candidate = '{}'\n",
+                synthetic_stripe_live_candidate()
+            ),
         )
         .unwrap();
 
